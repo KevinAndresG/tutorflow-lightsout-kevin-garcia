@@ -75,7 +75,7 @@ public class AnthropicClient(IHttpClientFactory fabrica, IConfiguration cfg) : I
         }
 
         using var req = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/v1/messages");
-        req.Headers.TryAddWithoutValidation("x-api-key", cfg["LLM_API_KEY"]);
+        req.Headers.TryAddWithoutValidation("x-api-key", cfg["LLM_API_KEY"]?.Trim());
         req.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
         using var doc = await LlmHttp.EnviarAsync(fabrica.CreateClient("llm"), req, cuerpo, ct);
 

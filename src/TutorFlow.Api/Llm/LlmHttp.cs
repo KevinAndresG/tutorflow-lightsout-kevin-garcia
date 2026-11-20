@@ -25,6 +25,8 @@ static class LlmHttp
         catch (OperationCanceledException) { throw new LlmException("El proveedor del modelo no respondió a tiempo."); }
         catch (JsonException) { throw new LlmException("El proveedor del modelo devolvió una respuesta no válida."); }
         catch (HttpRequestException) { throw new LlmException("No se pudo contactar al proveedor del modelo."); }
+        // Cualquier otra excepción (p. ej. FormatException por cabeceras inválidas) puede llevar la llave en su mensaje.
+        catch (Exception) { throw new LlmException("No se pudo contactar al proveedor del modelo."); }
     }
 
     public static JsonNode ParseOVacio(string json)

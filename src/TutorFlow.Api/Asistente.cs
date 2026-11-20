@@ -15,10 +15,20 @@ public record AsistenteResultado(
     IReadOnlyList<string> IdsEstudiantesConsultados,
     bool PermisoDenegado);
 
+// Uso real de una petición, legible aunque ResponderAsync termine en 403 o lance excepción.
+public class MedicionUso
+{
+    public int TokensEntrada { get; set; }
+    public int TokensSalida { get; set; }
+    public List<string> Ids { get; } = [];
+}
+
 public class Asistente(Reglamento reglamento, Datos datos, ILlmClient llm)
 {
     public const string SinRespuesta = "No encuentro esa información en el reglamento ni en los datos disponibles";
     const int MaxVueltas = 6;
+    const int MaxAnalisis = 64 * 1024;
+    const int MaxCandidatos = 64;
 
     static readonly IReadOnlyList<LlmHerramienta> Definiciones =
     [
@@ -30,8 +40,9 @@ public class Asistente(Reglamento reglamento, Datos datos, ILlmClient llm)
             """{"type":"object","properties":{}}"""),
     ];
 
-    public async Task<AsistenteResultado> ResponderAsync(Usuario usuario, string pregunta, CancellationToken ct)
+    public async Task<AsistenteResultado> ResponderAsync(Usuario usuario, string pregunta, CancellationToken ct, MedicionUso? medicion = null)
     {
+        medicion ??= new MedicionUso();
         var sistema = ConstruirSistema(usuario);
         var mensajes = new List<LlmMensaje> { new("user", $"<pregunta>{Neutralizar(pregunta)}</pregunta>") };
         var herramientas = new Herramientas(datos, usuario);
@@ -40,10 +51,14 @@ public class Asistente(Reglamento reglamento, Datos datos, ILlmClient llm)
         AsistenteResultado Resultado(string respuesta, IReadOnlyList<Cita> citas, bool denegado = false) =>
             new(respuesta, citas, herramientas.UsoDatos, tokens, herramientas.IdsConsultados, denegado);
 
+        try
+        {
         for (var vuelta = 0; vuelta < MaxVueltas; vuelta++)
         {
             var r = await llm.CompletarAsync(sistema, mensajes, Definiciones, ct);
             tokens += r.Uso.TokensEntrada + r.Uso.TokensSalida;
+            medicion.TokensEntrada += r.Uso.TokensEntrada;
+            medicion.TokensSalida += r.Uso.TokensSalida;
 
             if (r.Llamadas.Count == 0)
             {
@@ -60,6 +75,11 @@ public class Asistente(Reglamento reglamento, Datos datos, ILlmClient llm)
             }
         }
         return Resultado(SinRespuesta, []);
+        }
+        finally
+        {
+            foreach (var i in herramientas.IdsConsultados) if (!medicion.Ids.Contains(i)) medicion.Ids.Add(i);
+        }
     }
 
     // La pregunta es dato: se impide que cierre o abra la etiqueta que la delimita.
@@ -67,10 +87,11 @@ public class Asistente(Reglamento reglamento, Datos datos, ILlmClient llm)
     static string Neutralizar(string p)
     {
         var sb = new StringBuilder();
-        foreach (var ch in p.Normalize(NormalizationForm.FormKC))
+        foreach (var rune in p.Normalize(NormalizationForm.FormKC).EnumerateRunes())
         {
-            if (char.GetUnicodeCategory(ch) == System.Globalization.UnicodeCategory.Format) continue;
-            sb.Append(ch switch { '<' => "&lt;", '>' => "&gt;", _ => ch.ToString() });
+            if (Rune.GetUnicodeCategory(rune) == System.Globalization.UnicodeCategory.Format) continue;
+            if (rune.Value is >= 0xE0000 and <= 0xE007F) continue;
+            sb.Append(rune.Value switch { '<' => "&lt;", '>' => "&gt;", _ => rune.ToString() });
         }
         return sb.ToString();
     }
@@ -114,15 +135,18 @@ public class Asistente(Reglamento reglamento, Datos datos, ILlmClient llm)
     (string Respuesta, IReadOnlyList<Cita> Citas) InterpretarCrudo(string? texto)
     {
         texto ??= "";
+        // Acota el análisis: un texto enorme se devuelve crudo, sin citas.
+        if (texto.Length > MaxAnalisis) return (texto, []);
         var limpio = texto.Trim();
         var m = Regex.Match(limpio, @"^```[a-zA-Z]*\s*(.*?)\s*```$", RegexOptions.Singleline);
         if (m.Success) limpio = m.Groups[1].Value;
         if (IntentarParsear(limpio) is { } ok) return ok;
 
-        for (var i = limpio.IndexOf('{'); i >= 0; i = limpio.IndexOf('{', i + 1))
+        var intentos = 0;
+        for (var i = limpio.IndexOf('{'); i >= 0 && intentos++ < MaxCandidatos; i = limpio.IndexOf('{', i + 1))
         {
             var fin = FinObjeto(limpio, i);
-            if (fin < 0) continue;
+            if (fin < 0) break; // si esta llave no cierra, ninguna posterior puede cerrar
             if (IntentarParsear(limpio[i..(fin + 1)]) is { } envuelto) return envuelto;
         }
         return (string.IsNullOrWhiteSpace(texto) ? SinRespuesta : texto, []);

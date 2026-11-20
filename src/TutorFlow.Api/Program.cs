@@ -16,7 +16,10 @@ static string ResolverRuta(string? configurada)
 var ruta = ResolverRuta(builder.Configuration["Datos:Ruta"]);
 builder.Services.AddSingleton(_ => new Reglamento(Path.Combine(ruta, "reglamento")));
 builder.Services.AddSingleton(_ => new Datos(Path.Combine(ruta, "api")));
-builder.Services.AddHttpClient("llm", c => c.Timeout = TimeSpan.FromSeconds(60));
+builder.Services.AddHttpClient("llm", c => c.Timeout = TimeSpan.FromSeconds(60))
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
+builder.Services.AddSingleton(sp => Precios.Desde(sp.GetRequiredService<IConfiguration>()));
+builder.Services.AddSingleton<Auditoria>();
 builder.Services.AddSingleton<ILlmClient>(sp =>
 {
     var cfg = sp.GetRequiredService<IConfiguration>();
@@ -35,63 +38,101 @@ var app = builder.Build();
 app.Services.GetRequiredService<Reglamento>();
 app.Services.GetRequiredService<Datos>();
 app.Services.GetRequiredService<ILlmClient>();
+app.Services.GetRequiredService<Precios>();
 
 app.MapGet("/api/salud", () => Results.Json(new { estado = "ok" }));
 
-app.MapPost("/api/asistente/preguntar", async (HttpRequest req, Datos datos, IConfiguration cfg, Asistente asistente) =>
+app.MapPost("/api/asistente/preguntar", async (HttpRequest req, Datos datos, IConfiguration cfg, Asistente asistente,
+    Auditoria auditoria, Precios precios, ILogger<Program> log) =>
 {
-    static IResult Error(int codigo, string msg) => Results.Json(new { error = msg }, statusCode: codigo);
+    // Un solo punto de registro: el finally cubre toda ruta de salida.
+    string? rolAud = null, idAud = null, preguntaAud = null;
+    var codigo = 500;
+    IReadOnlyList<Cita> citasAud = [];
+    var medicion = new MedicionUso();
 
-    JsonDocument doc;
-    try { doc = await JsonDocument.ParseAsync(req.Body); }
-    catch (JsonException) { return Error(400, "El cuerpo no es un JSON válido."); }
-
-    using (doc)
+    IResult Error(int c, string msg)
     {
-        var raiz = doc.RootElement;
-        if (raiz.ValueKind != JsonValueKind.Object) return Error(400, "El cuerpo debe ser un objeto JSON.");
+        codigo = c;
+        return Results.Json(new { error = msg }, statusCode: c);
+    }
 
-        if (!raiz.TryGetProperty("pregunta", out var p) || p.ValueKind != JsonValueKind.String
-            || string.IsNullOrWhiteSpace(p.GetString()))
-            return Error(400, "La pregunta es obligatoria.");
-        if (p.GetString()!.Length > 1000) return Error(400, "La pregunta no puede superar 1.000 caracteres.");
+    try
+    {
+        JsonDocument doc;
+        try { doc = await JsonDocument.ParseAsync(req.Body); }
+        catch (JsonException) { return Error(400, "El cuerpo no es un JSON válido."); }
 
-        if (!raiz.TryGetProperty("usuario", out var u) || u.ValueKind != JsonValueKind.Object)
-            return Error(400, "El usuario es obligatorio.");
-        if (!u.TryGetProperty("rol", out var r) || r.ValueKind != JsonValueKind.String)
-            return Error(400, "El rol es obligatorio.");
-        var rol = r.GetString()!;
-        if (rol != "estudiante" && rol != "coordinador")
-            return Error(400, "El rol debe ser 'estudiante' o 'coordinador'.");
-        if (!u.TryGetProperty("id", out var i) || i.ValueKind != JsonValueKind.String
-            || string.IsNullOrWhiteSpace(i.GetString()))
-            return Error(400, "El id del usuario es obligatorio.");
-
-        var usuario = Permisos.ResolverUsuario(datos, rol, i.GetString()!);
-        if (usuario == null) return Error(403, "Usuario no válido.");
-        if (Permisos.MencionaTercero(datos, usuario, p.GetString()!))
-            return Error(403, "No tienes permiso para consultar datos de otros estudiantes.");
-
-        if (string.IsNullOrWhiteSpace(cfg["LLM_API_KEY"]))
-            return Error(503, "El servicio del modelo no está disponible: falta configurar LLM_API_KEY.");
-
-        AsistenteResultado res;
-        try { res = await asistente.ResponderAsync(usuario, p.GetString()!, req.HttpContext.RequestAborted); }
-        catch (OperationCanceledException) when (req.HttpContext.RequestAborted.IsCancellationRequested) { throw; }
-        catch (Exception) { return Error(503, "El proveedor del modelo no está disponible."); }
-
-        if (res.PermisoDenegado) return Error(403, "No tienes permiso para consultar esos datos.");
-
-        // T5 reemplaza este 0 por el cálculo con el precio configurado.
-        const double costoUsd = 0;
-        return Results.Json(new
+        using (doc)
         {
-            respuesta = res.Respuesta,
-            citas = res.Citas.Select(c => new { documento = c.Documento, seccion = c.Seccion }),
-            usoDatosEstudiante = res.UsoDatosEstudiante,
-            tokens = res.Tokens,
-            costoUsd,
-        });
+            var raiz = doc.RootElement;
+            if (raiz.ValueKind != JsonValueKind.Object) return Error(400, "El cuerpo debe ser un objeto JSON.");
+
+            static string? Texto(JsonElement e, string nombre) =>
+                e.ValueKind == JsonValueKind.Object && e.TryGetProperty(nombre, out var v) && v.ValueKind == JsonValueKind.String
+                    ? v.GetString() : null;
+            preguntaAud = Texto(raiz, "pregunta");
+            if (raiz.TryGetProperty("usuario", out var uAud))
+            {
+                rolAud = Texto(uAud, "rol");
+                idAud = Texto(uAud, "id");
+            }
+
+            if (string.IsNullOrWhiteSpace(preguntaAud)) return Error(400, "La pregunta es obligatoria.");
+            if (preguntaAud.Length > 1000) return Error(400, "La pregunta no puede superar 1.000 caracteres.");
+
+            if (!raiz.TryGetProperty("usuario", out var u) || u.ValueKind != JsonValueKind.Object)
+                return Error(400, "El usuario es obligatorio.");
+            if (rolAud == null) return Error(400, "El rol es obligatorio.");
+            if (rolAud != "estudiante" && rolAud != "coordinador")
+                return Error(400, "El rol debe ser 'estudiante' o 'coordinador'.");
+            if (string.IsNullOrWhiteSpace(idAud)) return Error(400, "El id del usuario es obligatorio.");
+
+            var usuario = Permisos.ResolverUsuario(datos, rolAud, idAud);
+            if (usuario == null) return Error(403, "Usuario no válido.");
+            if (Permisos.MencionaTercero(datos, usuario, preguntaAud))
+                return Error(403, "No tienes permiso para consultar datos de otros estudiantes.");
+
+            if (string.IsNullOrWhiteSpace(cfg["LLM_API_KEY"]))
+                return Error(503, "El servicio del modelo no está disponible: falta configurar LLM_API_KEY.");
+
+            var plazo = double.TryParse(cfg["Asistente:PlazoSegundos"], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var seg) && seg > 0 ? seg : 90;
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(req.HttpContext.RequestAborted);
+            cts.CancelAfter(TimeSpan.FromSeconds(plazo));
+
+            AsistenteResultado res;
+            try { res = await asistente.ResponderAsync(usuario, preguntaAud, cts.Token, medicion); }
+            catch (OperationCanceledException) when (req.HttpContext.RequestAborted.IsCancellationRequested) { throw; }
+            catch (Exception e)
+            {
+                log.LogWarning("Falla del asistente o del proveedor ({Tipo}).", e.GetType().Name);
+                return Error(503, "El proveedor del modelo no está disponible.");
+            }
+
+            if (res.PermisoDenegado) return Error(403, "No tienes permiso para consultar esos datos.");
+
+            codigo = 200;
+            citasAud = res.Citas;
+            return Results.Json(new
+            {
+                respuesta = res.Respuesta,
+                citas = res.Citas.Select(c => new { documento = c.Documento, seccion = c.Seccion }),
+                usoDatosEstudiante = res.UsoDatosEstudiante,
+                tokens = medicion.TokensEntrada + medicion.TokensSalida,
+                costoUsd = precios.Costo(medicion.TokensEntrada, medicion.TokensSalida),
+            });
+        }
+    }
+    catch (OperationCanceledException) when (req.HttpContext.RequestAborted.IsCancellationRequested)
+    {
+        codigo = 499;
+        throw;
+    }
+    finally
+    {
+        auditoria.Registrar(new RegistroAuditoria(rolAud, idAud, preguntaAud, medicion.Ids.ToList(), citasAud, codigo,
+            medicion.TokensEntrada + medicion.TokensSalida, precios.Costo(medicion.TokensEntrada, medicion.TokensSalida)));
     }
 });
 

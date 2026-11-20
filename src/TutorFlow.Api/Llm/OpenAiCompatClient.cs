@@ -1,4 +1,3 @@
-using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -41,7 +40,7 @@ public class OpenAiCompatClient(IHttpClientFactory fabrica, IConfiguration cfg) 
                 msgs.Add(new JsonObject { ["role"] = m.Rol, ["content"] = m.Contenido });
         }
 
-        var cuerpo = new JsonObject { ["model"] = modelo, ["messages"] = msgs };
+        var cuerpo = new JsonObject { ["model"] = modelo, ["messages"] = msgs, ["max_tokens"] = 2048 };
         if (herramientas.Count > 0)
         {
             var tools = new JsonArray();
@@ -60,7 +59,7 @@ public class OpenAiCompatClient(IHttpClientFactory fabrica, IConfiguration cfg) 
         }
 
         using var req = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/chat/completions");
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", cfg["LLM_API_KEY"]);
+        req.Headers.TryAddWithoutValidation("Authorization", "Bearer " + cfg["LLM_API_KEY"]?.Trim());
         using var doc = await LlmHttp.EnviarAsync(fabrica.CreateClient("llm"), req, cuerpo, ct);
 
         try
