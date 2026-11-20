@@ -59,9 +59,27 @@ app.MapPost("/api/asistente/preguntar", async (HttpRequest req, Datos datos, ICo
 
     try
     {
+        const int MaxCuerpo = 64 * 1024;
+        var limite = req.HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>();
+        if (limite is { IsReadOnly: false }) limite.MaxRequestBodySize = MaxCuerpo;
+
         JsonDocument doc;
-        try { doc = await JsonDocument.ParseAsync(req.Body); }
+        try
+        {
+            using var ms = new MemoryStream();
+            var buf = new byte[8192];
+            int n;
+            while ((n = await req.Body.ReadAsync(buf, req.HttpContext.RequestAborted)) > 0)
+            {
+                if (ms.Length + n > MaxCuerpo) return Error(400, "El cuerpo es demasiado grande.");
+                ms.Write(buf, 0, n);
+            }
+            ms.Position = 0;
+            doc = await JsonDocument.ParseAsync(ms);
+        }
         catch (JsonException) { return Error(400, "El cuerpo no es un JSON válido."); }
+        catch (OperationCanceledException) when (req.HttpContext.RequestAborted.IsCancellationRequested) { throw; }
+        catch (Exception) { return Error(400, "No se pudo leer el cuerpo de la petición."); }
 
         using (doc)
         {
@@ -119,7 +137,7 @@ app.MapPost("/api/asistente/preguntar", async (HttpRequest req, Datos datos, ICo
                 respuesta = res.Respuesta,
                 citas = res.Citas.Select(c => new { documento = c.Documento, seccion = c.Seccion }),
                 usoDatosEstudiante = res.UsoDatosEstudiante,
-                tokens = medicion.TokensEntrada + medicion.TokensSalida,
+                tokens = medicion.Total,
                 costoUsd = precios.Costo(medicion.TokensEntrada, medicion.TokensSalida),
             });
         }
@@ -129,10 +147,15 @@ app.MapPost("/api/asistente/preguntar", async (HttpRequest req, Datos datos, ICo
         codigo = 499;
         throw;
     }
+    catch (Exception e)
+    {
+        log.LogError("Excepción inesperada ({Tipo}).", e.GetType().Name);
+        return Error(503, "El servicio no está disponible.");
+    }
     finally
     {
         auditoria.Registrar(new RegistroAuditoria(rolAud, idAud, preguntaAud, medicion.Ids.ToList(), citasAud, codigo,
-            medicion.TokensEntrada + medicion.TokensSalida, precios.Costo(medicion.TokensEntrada, medicion.TokensSalida)));
+            medicion.Total, precios.Costo(medicion.TokensEntrada, medicion.TokensSalida)));
     }
 });
 

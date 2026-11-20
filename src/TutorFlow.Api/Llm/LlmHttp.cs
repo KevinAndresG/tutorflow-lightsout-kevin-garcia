@@ -37,5 +37,5 @@ static class LlmHttp
 
     public static int Entero(JsonElement padre, string nombre) =>
         padre.ValueKind == JsonValueKind.Object && padre.TryGetProperty(nombre, out var v)
-        && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var n) ? n : 0;
+        && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var n) ? Math.Max(0, n) : 0;
 }

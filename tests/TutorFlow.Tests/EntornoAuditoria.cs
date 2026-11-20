@@ -37,6 +37,8 @@ public sealed class EntornoAuditoria : IDisposable
     private readonly WebApplicationFactory<Program> _fabrica;
     public string RutaAuditoria { get; }
     public HttpClient Cliente { get; }
+    /// <summary>Servidor en memoria, para peticiones con cuerpo construido a mano (p. ej. un stream que lanza).</summary>
+    public TestServer Servidor => _fabrica.Server;
     public LogsEnMemoria Logs { get; } = new();
     public ProveedorHttpFalso Proveedor { get; } = new();
 
@@ -45,7 +47,7 @@ public sealed class EntornoAuditoria : IDisposable
     /// <param name="llave">Valor de LLM_API_KEY ("" = sin llave).</param>
     /// <param name="rutaAuditoria">Ruta de auditoría; por defecto un archivo temporal único.</param>
     public EntornoAuditoria(ILlmClient? llm, IDictionary<string, string?>? config = null, string llave = Llave,
-        string? rutaAuditoria = null)
+        string? rutaAuditoria = null, Action<IConfigurationBuilder>? configurar = null)
     {
         RutaAuditoria = rutaAuditoria ?? Path.Combine(Path.GetTempPath(), "tf-audit-" + Guid.NewGuid().ToString("N") + ".jsonl");
         var cfg = new Dictionary<string, string?>
@@ -59,7 +61,7 @@ public sealed class EntornoAuditoria : IDisposable
         _fabrica = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
         {
             foreach (var (k, v) in cfg) b.UseSetting(k, v);
-            b.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(cfg));
+            b.ConfigureAppConfiguration((_, c) => { c.AddInMemoryCollection(cfg); configurar?.Invoke(c); });
             b.ConfigureServices(sv => sv.AddLogging(l => { l.SetMinimumLevel(LogLevel.Trace); l.AddProvider(Logs); }));
             b.ConfigureTestServices(sv =>
             {

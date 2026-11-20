@@ -18,8 +18,10 @@ public record AsistenteResultado(
 // Uso real de una petición, legible aunque ResponderAsync termine en 403 o lance excepción.
 public class MedicionUso
 {
-    public int TokensEntrada { get; set; }
-    public int TokensSalida { get; set; }
+    public long TokensEntrada { get; set; }
+    public long TokensSalida { get; set; }
+    // Total acotado: nunca negativo ni mayor que int.MaxValue (sin envolver).
+    public int Total => (int)Math.Clamp(TokensEntrada + TokensSalida, 0L, int.MaxValue);
     public List<string> Ids { get; } = [];
 }
 
@@ -46,19 +48,20 @@ public class Asistente(Reglamento reglamento, Datos datos, ILlmClient llm)
         var sistema = ConstruirSistema(usuario);
         var mensajes = new List<LlmMensaje> { new("user", $"<pregunta>{Neutralizar(pregunta)}</pregunta>") };
         var herramientas = new Herramientas(datos, usuario);
-        var tokens = 0;
+        long tokens = 0;
 
         AsistenteResultado Resultado(string respuesta, IReadOnlyList<Cita> citas, bool denegado = false) =>
-            new(respuesta, citas, herramientas.UsoDatos, tokens, herramientas.IdsConsultados, denegado);
+            new(respuesta, citas, herramientas.UsoDatos, (int)Math.Clamp(tokens, 0L, int.MaxValue), herramientas.IdsConsultados, denegado);
 
         try
         {
         for (var vuelta = 0; vuelta < MaxVueltas; vuelta++)
         {
             var r = await llm.CompletarAsync(sistema, mensajes, Definiciones, ct);
-            tokens += r.Uso.TokensEntrada + r.Uso.TokensSalida;
-            medicion.TokensEntrada += r.Uso.TokensEntrada;
-            medicion.TokensSalida += r.Uso.TokensSalida;
+            long te = Math.Max(0, r.Uso.TokensEntrada), ts = Math.Max(0, r.Uso.TokensSalida);
+            tokens += te + ts;
+            medicion.TokensEntrada += te;
+            medicion.TokensSalida += ts;
 
             if (r.Llamadas.Count == 0)
             {
@@ -146,7 +149,7 @@ public class Asistente(Reglamento reglamento, Datos datos, ILlmClient llm)
         for (var i = limpio.IndexOf('{'); i >= 0 && intentos++ < MaxCandidatos; i = limpio.IndexOf('{', i + 1))
         {
             var fin = FinObjeto(limpio, i);
-            if (fin < 0) break; // si esta llave no cierra, ninguna posterior puede cerrar
+            if (fin < 0) continue; // el escaneo respeta cadenas: una llave posterior sí puede cerrar
             if (IntentarParsear(limpio[i..(fin + 1)]) is { } envuelto) return envuelto;
         }
         return (string.IsNullOrWhiteSpace(texto) ? SinRespuesta : texto, []);
