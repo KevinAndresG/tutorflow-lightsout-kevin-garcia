@@ -24,7 +24,16 @@ public static class Fabrica
                 ["Datos:Ruta"] = RutaFixtures,
                 ["LLM_API_KEY"] = llave,
             }));
+            // Protección contra red real: ninguna prueba con llave debe salir al proveedor.
+            b.ConfigureTestServices(sv => sv.AddHttpClient("llm").ConfigurePrimaryHttpMessageHandler(() => new BloqueaRedHandler()));
             if (servicios != null) b.ConfigureTestServices(servicios);
         });
     }
+}
+
+/// <summary>Manejador "llm" por defecto de las pruebas: falla fuerte si algo intenta salir a la red.</summary>
+public sealed class BloqueaRedHandler : HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+        throw new InvalidOperationException("PRUEBA INTENTÓ USAR LA RED REAL: " + request.Method + " " + request.RequestUri);
 }

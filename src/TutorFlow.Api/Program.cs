@@ -16,7 +16,17 @@ static string ResolverRuta(string? configurada)
 var ruta = ResolverRuta(builder.Configuration["Datos:Ruta"]);
 builder.Services.AddSingleton(_ => new Reglamento(Path.Combine(ruta, "reglamento")));
 builder.Services.AddSingleton(_ => new Datos(Path.Combine(ruta, "api")));
-builder.Services.AddSingleton<ILlmClient, SinLlmClient>();
+builder.Services.AddHttpClient("llm", c => c.Timeout = TimeSpan.FromSeconds(60));
+builder.Services.AddSingleton<ILlmClient>(sp =>
+{
+    var cfg = sp.GetRequiredService<IConfiguration>();
+    var proveedor = (cfg["LLM_PROVIDER"] ?? "").Trim();
+    if (proveedor.Length == 0 || proveedor.Equals("openai", StringComparison.OrdinalIgnoreCase))
+        return ActivatorUtilities.CreateInstance<OpenAiCompatClient>(sp);
+    if (proveedor.Equals("anthropic", StringComparison.OrdinalIgnoreCase))
+        return ActivatorUtilities.CreateInstance<AnthropicClient>(sp);
+    throw new InvalidOperationException("LLM_PROVIDER no es válido: use 'openai' o 'anthropic'.");
+});
 builder.Services.AddSingleton<Asistente>();
 
 var app = builder.Build();
@@ -24,6 +34,7 @@ var app = builder.Build();
 // Carga eager: un dato corrupto falla al arrancar, nunca convierte un 400 en 500.
 app.Services.GetRequiredService<Reglamento>();
 app.Services.GetRequiredService<Datos>();
+app.Services.GetRequiredService<ILlmClient>();
 
 app.MapGet("/api/salud", () => Results.Json(new { estado = "ok" }));
 

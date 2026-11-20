@@ -53,7 +53,12 @@ public sealed class EntornoAsistente : IDisposable
                 ["Datos:Ruta"] = ruta,
                 ["LLM_API_KEY"] = "llave-falsa-de-prueba",
             }));
-            b.ConfigureTestServices(sv => { sv.RemoveAll<ILlmClient>(); sv.AddSingleton<ILlmClient>(llm); });
+            b.ConfigureTestServices(sv =>
+            {
+                sv.AddHttpClient("llm").ConfigurePrimaryHttpMessageHandler(() => new BloqueaRedHandler());
+                sv.RemoveAll<ILlmClient>();
+                sv.AddSingleton<ILlmClient>(llm);
+            });
         });
         Cliente = _fabrica.CreateClient();
         Cliente.Timeout = TimeSpan.FromSeconds(60);

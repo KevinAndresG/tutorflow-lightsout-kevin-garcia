@@ -63,7 +63,17 @@ public class Asistente(Reglamento reglamento, Datos datos, ILlmClient llm)
     }
 
     // La pregunta es dato: se impide que cierre o abra la etiqueta que la delimita.
-    static string Neutralizar(string p) => Regex.Replace(p, @"<\s*/?\s*pregunta\s*>", "[etiqueta]", RegexOptions.IgnoreCase);
+    // Se quitan los caracteres de formato (Cf), se normaliza (＜ pasa a <) y se escapan todos los < y >.
+    static string Neutralizar(string p)
+    {
+        var sb = new StringBuilder();
+        foreach (var ch in p.Normalize(NormalizationForm.FormKC))
+        {
+            if (char.GetUnicodeCategory(ch) == System.Globalization.UnicodeCategory.Format) continue;
+            sb.Append(ch switch { '<' => "&lt;", '>' => "&gt;", _ => ch.ToString() });
+        }
+        return sb.ToString();
+    }
 
     string ConstruirSistema(Usuario u)
     {
@@ -94,13 +104,55 @@ public class Asistente(Reglamento reglamento, Datos datos, ILlmClient llm)
 
     (string Respuesta, IReadOnlyList<Cita> Citas) Interpretar(string? texto)
     {
+        var (respuesta, citas) = InterpretarCrudo(texto);
+        if (string.IsNullOrWhiteSpace(respuesta)) return (SinRespuesta, []);
+        if (string.Equals(respuesta.Trim().TrimEnd('.').TrimEnd(), SinRespuesta, StringComparison.OrdinalIgnoreCase))
+            return (respuesta, []);
+        return (respuesta, citas);
+    }
+
+    (string Respuesta, IReadOnlyList<Cita> Citas) InterpretarCrudo(string? texto)
+    {
         texto ??= "";
         var limpio = texto.Trim();
         var m = Regex.Match(limpio, @"^```[a-zA-Z]*\s*(.*?)\s*```$", RegexOptions.Singleline);
         if (m.Success) limpio = m.Groups[1].Value;
+        if (IntentarParsear(limpio) is { } ok) return ok;
+
+        for (var i = limpio.IndexOf('{'); i >= 0; i = limpio.IndexOf('{', i + 1))
+        {
+            var fin = FinObjeto(limpio, i);
+            if (fin < 0) continue;
+            if (IntentarParsear(limpio[i..(fin + 1)]) is { } envuelto) return envuelto;
+        }
+        return (string.IsNullOrWhiteSpace(texto) ? SinRespuesta : texto, []);
+    }
+
+    // Índice de la llave que cierra el objeto abierto en `inicio`, respetando cadenas JSON; -1 si no cierra.
+    static int FinObjeto(string t, int inicio)
+    {
+        var nivel = 0;
+        var enCadena = false;
+        for (var k = inicio; k < t.Length; k++)
+        {
+            var c = t[k];
+            if (enCadena)
+            {
+                if (c == (char)92) k++;
+                else if (c == '"') enCadena = false;
+            }
+            else if (c == '"') enCadena = true;
+            else if (c == '{') nivel++;
+            else if (c == '}' && --nivel == 0) return k;
+        }
+        return -1;
+    }
+
+    (string Respuesta, IReadOnlyList<Cita> Citas)? IntentarParsear(string json)
+    {
         try
         {
-            using var doc = JsonDocument.Parse(limpio);
+            using var doc = JsonDocument.Parse(json);
             var raiz = doc.RootElement;
             if (raiz.ValueKind == JsonValueKind.Object && raiz.TryGetProperty("respuesta", out var r)
                 && r.ValueKind == JsonValueKind.String)
@@ -119,7 +171,7 @@ public class Asistente(Reglamento reglamento, Datos datos, ILlmClient llm)
             }
         }
         catch (JsonException) { }
-        return (string.IsNullOrWhiteSpace(texto) ? SinRespuesta : texto, []);
+        return null;
     }
 }
 
