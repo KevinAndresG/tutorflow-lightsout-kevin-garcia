@@ -18,88 +18,62 @@ public static class Permisos
     }
 
     // true si la pregunta menciona (por id o nombre) a algún estudiante que el usuario no puede ver.
+    // Las apariciones que caen por completo dentro del tramo del propio nombre completo o del propio id se ignoran;
+    // una aparición que se extiende más allá de ese tramo (o aparece fuera) cuenta.
     public static bool MencionaTercero(Datos datos, Usuario usuario, string pregunta)
     {
         var tokens = Tokenizar(pregunta);
-        // Antes de quitar nada: el nombre completo de un tercero (aunque extienda el propio) es un tercero.
-        foreach (var e in datos.Estudiantes)
+        var propio = new bool[tokens.Count];
+        foreach (var (i, n) in Apariciones(tokens, Tokenizar(usuario.Nombre)))
+            for (var k = i; k < i + n; k++) propio[k] = true;
+        foreach (var (i, n) in AparicionesId(tokens, string.Concat(Tokenizar(usuario.Id))))
+            for (var k = i; k < i + n; k++) propio[k] = true;
+
+        bool Fuera(int i, int n)
         {
-            if (usuario.Rol == "estudiante" && e.Id == usuario.Id) continue;
-            if (PuedeVerEstudiante(datos, usuario, e.Id)) continue;
-            if (ContieneSecuencia(tokens, Tokenizar(e.Nombre))) return true;
+            for (var k = i; k < i + n; k++) if (!propio[k]) return true;
+            return false;
         }
-        // El propio nombre completo exacto y el propio id no cuentan como terceros.
-        tokens = QuitarSecuencia(tokens, Tokenizar(usuario.Nombre));
-        tokens = QuitarId(tokens, string.Concat(Tokenizar(usuario.Id)));
-        var conjunto = new HashSet<string>(tokens);
+
         foreach (var e in datos.Estudiantes)
         {
             if (usuario.Rol == "estudiante" && e.Id == usuario.Id) continue;
             if (PuedeVerEstudiante(datos, usuario, e.Id)) continue;
-            if (ContieneId(tokens, string.Concat(Tokenizar(e.Id)))) return true;
             var partes = Tokenizar(e.Nombre);
-            if (partes.Count > 0 && conjunto.Contains(partes[0])) return true;
+            if (Apariciones(tokens, partes).Any(a => Fuera(a.Inicio, a.Largo))) return true;
+            if (AparicionesId(tokens, string.Concat(Tokenizar(e.Id))).Any(a => Fuera(a.Inicio, a.Largo))) return true;
+            if (partes.Count > 0)
+                for (var i = 0; i < tokens.Count; i++)
+                    if (tokens[i] == partes[0] && !propio[i]) return true;
         }
         return false;
     }
 
-    static bool ContieneSecuencia(List<string> tokens, List<string> seq)
+    static List<(int Inicio, int Largo)> Apariciones(List<string> tokens, List<string> seq)
     {
-        if (seq.Count == 0) return false;
+        var r = new List<(int, int)>();
+        if (seq.Count == 0) return r;
         for (var i = 0; i + seq.Count <= tokens.Count; i++)
-            if (tokens.Skip(i).Take(seq.Count).SequenceEqual(seq)) return true;
-        return false;
-    }
-
-    static List<string> QuitarSecuencia(List<string> tokens, List<string> seq)
-    {
-        if (seq.Count == 0) return tokens;
-        var r = new List<string>();
-        for (var i = 0; i < tokens.Count;)
-        {
-            if (i + seq.Count <= tokens.Count && tokens.Skip(i).Take(seq.Count).SequenceEqual(seq)) { i += seq.Count; r.Add("|"); }
-            else r.Add(tokens[i++]);
-        }
-        return r;
-    }
-
-    // Quita tokens consecutivos que concatenados forman exactamente la clave del id.
-    static List<string> QuitarId(List<string> tokens, string clave)
-    {
-        if (clave.Length == 0) return tokens;
-        var r = new List<string>();
-        for (var i = 0; i < tokens.Count;)
-        {
-            var acc = "";
-            var j = i;
-            var hallado = false;
-            for (; j < tokens.Count; j++)
-            {
-                acc += tokens[j];
-                if (acc == clave) { hallado = true; break; }
-                if (!clave.StartsWith(acc, StringComparison.Ordinal)) break;
-            }
-            if (hallado) { i = j + 1; r.Add("|"); }
-            else r.Add(tokens[i++]);
-        }
+            if (tokens.Skip(i).Take(seq.Count).SequenceEqual(seq)) r.Add((i, seq.Count));
         return r;
     }
 
     // El id colapsado (solo letras y dígitos) coincide con un token o con tokens consecutivos concatenados.
-    static bool ContieneId(List<string> tokens, string clave)
+    static List<(int Inicio, int Largo)> AparicionesId(List<string> tokens, string clave)
     {
-        if (clave.Length == 0) return false;
+        var r = new List<(int, int)>();
+        if (clave.Length == 0) return r;
         for (var i = 0; i < tokens.Count; i++)
         {
             var acc = "";
             for (var j = i; j < tokens.Count; j++)
             {
                 acc += tokens[j];
-                if (acc == clave) return true;
+                if (acc == clave) { r.Add((i, j - i + 1)); break; }
                 if (!clave.StartsWith(acc, StringComparison.Ordinal)) break;
             }
         }
-        return false;
+        return r;
     }
 
     // FormKD, sin categorías Cf/Mn, minúsculas; luego secuencias de letras/dígitos.
