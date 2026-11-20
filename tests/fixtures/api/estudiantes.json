@@ -1,0 +1,4 @@
+[
+  { "id": "T-E1", "nombre": "Alicia Prueba Uno", "programa": "Programa Alfa", "semestre": 2 },
+  { "id": "T-E2", "nombre": "Bruno Prueba Dos", "programa": "Programa Beta", "semestre": 3 }
+]

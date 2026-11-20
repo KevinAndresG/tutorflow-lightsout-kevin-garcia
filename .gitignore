@@ -1,0 +1,9 @@
+bin/
+obj/
+node_modules/
+dist/
+.env
+logs/auditoria*
+*.user
+.vs/
+Prueba técnica - senior full Stack con IA.pdf
