@@ -1,4 +1,7 @@
 [
   { "id": "T-E1", "nombre": "Alicia Prueba Uno", "programa": "Programa Alfa", "semestre": 2 },
-  { "id": "T-E2", "nombre": "Bruno Prueba Dos", "programa": "Programa Beta", "semestre": 3 }
+  { "id": "T-E2", "nombre": "Bruno Prueba Dos", "programa": "Programa Beta", "semestre": 3 },
+  { "id": "T-E3", "nombre": "Damián Ríos Tres", "programa": "Programa Alfa", "semestre": 4 },
+  { "id": "T-E4", "nombre": "Alicia Segunda Cuatro", "programa": "Programa Beta", "semestre": 1 },
+  { "id": "T-E5", "nombre": "María José Prueba Cinco", "programa": "Programa Beta", "semestre": 2 }
 ]

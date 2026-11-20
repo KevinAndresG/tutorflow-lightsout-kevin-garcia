@@ -20,6 +20,10 @@ builder.Services.AddSingleton<ILlmClient, SinLlmClient>();
 
 var app = builder.Build();
 
+// Carga eager: un dato corrupto falla al arrancar, nunca convierte un 400 en 500.
+app.Services.GetRequiredService<Reglamento>();
+app.Services.GetRequiredService<Datos>();
+
 app.MapGet("/api/salud", () => Results.Json(new { estado = "ok" }));
 
 app.MapPost("/api/asistente/preguntar", async (HttpRequest req, Datos datos, IConfiguration cfg) =>
@@ -44,18 +48,22 @@ app.MapPost("/api/asistente/preguntar", async (HttpRequest req, Datos datos, ICo
             return Error(400, "El usuario es obligatorio.");
         if (!u.TryGetProperty("rol", out var r) || r.ValueKind != JsonValueKind.String)
             return Error(400, "El rol es obligatorio.");
-        var rol = r.GetString();
+        var rol = r.GetString()!;
         if (rol != "estudiante" && rol != "coordinador")
             return Error(400, "El rol debe ser 'estudiante' o 'coordinador'.");
         if (!u.TryGetProperty("id", out var i) || i.ValueKind != JsonValueKind.String
             || string.IsNullOrWhiteSpace(i.GetString()))
             return Error(400, "El id del usuario es obligatorio.");
 
+        var usuario = Permisos.ResolverUsuario(datos, rol, i.GetString()!);
+        if (usuario == null) return Error(403, "Usuario no válido.");
+        if (Permisos.MencionaTercero(datos, usuario, p.GetString()!))
+            return Error(403, "No tienes permiso para consultar datos de otros estudiantes.");
+
         if (string.IsNullOrWhiteSpace(cfg["LLM_API_KEY"]))
             return Error(503, "El servicio del modelo no está disponible: falta configurar LLM_API_KEY.");
 
-        // T3/T4: permisos (403) y asistente real.
-        _ = datos;
+        // T4: asistente real.
         return Error(503, "El asistente aún no está disponible.");
     }
 });

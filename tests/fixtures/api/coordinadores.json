@@ -1,3 +1,4 @@
 [
-  { "id": "T-C1", "nombre": "Carla Coordinadora", "programa": "Programa Alfa" }
+  { "id": "T-C1", "nombre": "Carla Coordinadora", "programa": "Programa Alfa" },
+  { "id": "T-C2", "nombre": "Esteban Coordinador", "programa": "Programa Beta" }
 ]
