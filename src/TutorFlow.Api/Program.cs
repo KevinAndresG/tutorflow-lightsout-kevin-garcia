@@ -17,6 +17,7 @@ var ruta = ResolverRuta(builder.Configuration["Datos:Ruta"]);
 builder.Services.AddSingleton(_ => new Reglamento(Path.Combine(ruta, "reglamento")));
 builder.Services.AddSingleton(_ => new Datos(Path.Combine(ruta, "api")));
 builder.Services.AddSingleton<ILlmClient, SinLlmClient>();
+builder.Services.AddSingleton<Asistente>();
 
 var app = builder.Build();
 
@@ -26,7 +27,7 @@ app.Services.GetRequiredService<Datos>();
 
 app.MapGet("/api/salud", () => Results.Json(new { estado = "ok" }));
 
-app.MapPost("/api/asistente/preguntar", async (HttpRequest req, Datos datos, IConfiguration cfg) =>
+app.MapPost("/api/asistente/preguntar", async (HttpRequest req, Datos datos, IConfiguration cfg, Asistente asistente) =>
 {
     static IResult Error(int codigo, string msg) => Results.Json(new { error = msg }, statusCode: codigo);
 
@@ -63,8 +64,23 @@ app.MapPost("/api/asistente/preguntar", async (HttpRequest req, Datos datos, ICo
         if (string.IsNullOrWhiteSpace(cfg["LLM_API_KEY"]))
             return Error(503, "El servicio del modelo no está disponible: falta configurar LLM_API_KEY.");
 
-        // T4: asistente real.
-        return Error(503, "El asistente aún no está disponible.");
+        AsistenteResultado res;
+        try { res = await asistente.ResponderAsync(usuario, p.GetString()!, req.HttpContext.RequestAborted); }
+        catch (OperationCanceledException) when (req.HttpContext.RequestAborted.IsCancellationRequested) { throw; }
+        catch (Exception) { return Error(503, "El proveedor del modelo no está disponible."); }
+
+        if (res.PermisoDenegado) return Error(403, "No tienes permiso para consultar esos datos.");
+
+        // T5 reemplaza este 0 por el cálculo con el precio configurado.
+        const double costoUsd = 0;
+        return Results.Json(new
+        {
+            respuesta = res.Respuesta,
+            citas = res.Citas.Select(c => new { documento = c.Documento, seccion = c.Seccion }),
+            usoDatosEstudiante = res.UsoDatosEstudiante,
+            tokens = res.Tokens,
+            costoUsd,
+        });
     }
 });
 

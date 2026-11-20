@@ -1,3 +1,5 @@
 [
-  { "estudianteId": "T-E1", "periodo": "2026-2", "asignatura": "Materia A", "sesionesProgramadas": 48, "inasistencias": 1 }
+  { "estudianteId": "T-E1", "periodo": "2026-2", "asignatura": "Materia A", "sesionesProgramadas": 48, "inasistencias": 1 },
+  { "estudianteId": "T-E2", "periodo": "2026-2", "asignatura": "Materia Secreta Beta", "sesionesProgramadas": 40, "inasistencias": 9 },
+  { "estudianteId": "T-E3", "periodo": "2026-2", "asignatura": "Materia C", "sesionesProgramadas": 32, "inasistencias": 5 }
 ]

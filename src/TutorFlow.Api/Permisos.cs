@@ -20,6 +20,8 @@ public static class Permisos
     // true si la pregunta menciona (por id o nombre) a algún estudiante que el usuario no puede ver.
     // Las apariciones que caen por completo dentro del tramo del propio nombre completo o del propio id se ignoran;
     // una aparición que se extiende más allá de ese tramo (o aparece fuera) cuenta.
+    // Decisión SPEC §9: si el nombre de un tercero es subsecuencia contigua del nombre propio, dentro del tramo
+    // propio no se detecta (es el usuario nombrándose a sí mismo); solo cuenta si aparece fuera o se extiende más allá.
     public static bool MencionaTercero(Datos datos, Usuario usuario, string pregunta)
     {
         var tokens = Tokenizar(pregunta);
