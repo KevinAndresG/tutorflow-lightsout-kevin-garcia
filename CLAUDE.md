@@ -1,0 +1,1 @@
+Las instrucciones para agentes de este repositorio están en @AGENTS.md. La especificación está en @SPEC.md y los escenarios de aceptación en `/escenarios`. El funcionamiento de la fábrica está en @FABRICA.md.
