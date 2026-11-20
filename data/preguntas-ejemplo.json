@@ -1,0 +1,115 @@
+[
+  {
+    "id": "P-01",
+    "escenario": "ESC-01.1",
+    "usuario": { "rol": "estudiante", "id": "E-001" },
+    "pregunta": "¿Cuál es la nota mínima para aprobar una asignatura?",
+    "codigoEsperado": 200,
+    "citasEsperadas": [
+      { "documento": "reglamento-academico.md", "seccion": "Escala de calificación y nota mínima aprobatoria" }
+    ],
+    "palabrasClave": ["3.0"],
+    "usoDatosEstudianteEsperado": false
+  },
+  {
+    "id": "P-02",
+    "escenario": "ESC-01.2",
+    "usuario": { "rol": "estudiante", "id": "E-001" },
+    "pregunta": "Si pierdo una materia, ¿puedo cancelarla y en qué plazo?",
+    "codigoEsperado": 200,
+    "citasEsperadas": [
+      { "documento": "reglamento-academico.md", "seccion": "Pérdida de asignatura" },
+      { "documento": "reglamento-academico.md", "seccion": "Cancelación de asignaturas" }
+    ],
+    "palabrasClave": ["semana 8"],
+    "usoDatosEstudianteEsperado": false
+  },
+  {
+    "id": "P-03",
+    "escenario": "ESC-01.3",
+    "usuario": { "rol": "coordinador", "id": "C-001" },
+    "pregunta": "¿Qué porcentaje de inasistencia hace perder una asignatura?",
+    "codigoEsperado": 200,
+    "citasEsperadas": [
+      { "documento": "reglamento-asistencia.md", "seccion": "Límite de inasistencia" }
+    ],
+    "palabrasClave": ["20%"],
+    "usoDatosEstudianteEsperado": false
+  },
+  {
+    "id": "P-04",
+    "escenario": "ESC-01.4",
+    "usuario": { "rol": "estudiante", "id": "E-001" },
+    "pregunta": "¿Me pueden echar por copiar en un parcial?",
+    "codigoEsperado": 200,
+    "citasEsperadas": [
+      { "documento": "reglamento-disciplinario.md", "seccion": "Sanciones por fraude académico" }
+    ],
+    "palabrasClave": ["0.0"],
+    "usoDatosEstudianteEsperado": false
+  },
+  {
+    "id": "P-05",
+    "escenario": "ESC-02.1",
+    "usuario": { "rol": "estudiante", "id": "E-001" },
+    "pregunta": "¿Cómo voy en mis materias?",
+    "codigoEsperado": 200,
+    "citasEsperadas": [],
+    "palabrasClave": ["Estructuras de Datos", "Álgebra Lineal", "Bases de Datos", "Física Mecánica"],
+    "usoDatosEstudianteEsperado": true
+  },
+  {
+    "id": "P-06",
+    "escenario": "ESC-02.2",
+    "usuario": { "rol": "estudiante", "id": "E-001" },
+    "pregunta": "¿Estoy en riesgo de perder alguna materia por fallas?",
+    "codigoEsperado": 200,
+    "citasEsperadas": [
+      { "documento": "reglamento-asistencia.md", "seccion": "Límite de inasistencia" }
+    ],
+    "palabrasClave": ["Álgebra Lineal", "20%"],
+    "usoDatosEstudianteEsperado": true
+  },
+  {
+    "id": "P-07",
+    "escenario": "ESC-02.3",
+    "usuario": { "rol": "estudiante", "id": "E-001" },
+    "pregunta": "¿Cuál es mi promedio?",
+    "codigoEsperado": 200,
+    "citasEsperadas": [],
+    "palabrasClave": [],
+    "palabrasClaveAlguna": ["3.83", "3.8", "3.75"],
+    "usoDatosEstudianteEsperado": true,
+    "nota": "Ponderado por créditos: 3.83. Promedio simple de definitivas: 3.75. Cualquiera de los dos es aceptable."
+  },
+  {
+    "id": "P-08",
+    "escenario": "ESC-02.4",
+    "usuario": { "rol": "coordinador", "id": "C-001" },
+    "pregunta": "¿Cómo va Brayan en asistencia?",
+    "codigoEsperado": 200,
+    "citasEsperadas": [],
+    "palabrasClave": ["Estructuras de Datos", "11"],
+    "usoDatosEstudianteEsperado": true
+  },
+  {
+    "id": "P-09",
+    "escenario": "ESC-05.1",
+    "usuario": { "rol": "estudiante", "id": "E-001" },
+    "pregunta": "¿Cuál es el horario de la cafetería?",
+    "codigoEsperado": 200,
+    "citasEsperadas": [],
+    "palabrasClave": ["No encuentro"],
+    "usoDatosEstudianteEsperado": false
+  },
+  {
+    "id": "P-10",
+    "escenario": "ESC-03",
+    "usuario": { "rol": "estudiante", "id": "E-001" },
+    "pregunta": "¿Cuáles son las notas de Brayan Gómez?",
+    "codigoEsperado": 403,
+    "citasEsperadas": [],
+    "palabrasClave": [],
+    "usoDatosEstudianteEsperado": false
+  }
+]

@@ -1,0 +1,15 @@
+[
+  { "estudianteId": "E-001", "periodo": "2026-2", "asignatura": "Estructuras de Datos", "creditos": 4, "corte1": 4.2, "corte2": 3.8, "corte3": 4.0, "definitiva": 4.0 },
+  { "estudianteId": "E-001", "periodo": "2026-2", "asignatura": "Álgebra Lineal", "creditos": 3, "corte1": 3.5, "corte2": 3.2, "corte3": 3.4, "definitiva": 3.4 },
+  { "estudianteId": "E-001", "periodo": "2026-2", "asignatura": "Bases de Datos", "creditos": 3, "corte1": 4.5, "corte2": 4.6, "corte3": 4.7, "definitiva": 4.6 },
+  { "estudianteId": "E-001", "periodo": "2026-2", "asignatura": "Física Mecánica", "creditos": 2, "corte1": 3.0, "corte2": 3.1, "corte3": 3.0, "definitiva": 3.0 },
+
+  { "estudianteId": "E-002", "periodo": "2026-2", "asignatura": "Estructuras de Datos", "creditos": 4, "corte1": 2.8, "corte2": 3.0, "corte3": 3.2, "definitiva": 3.0 },
+  { "estudianteId": "E-002", "periodo": "2026-2", "asignatura": "Álgebra Lineal", "creditos": 3, "corte1": 3.9, "corte2": 4.1, "corte3": 4.0, "definitiva": 4.0 },
+  { "estudianteId": "E-002", "periodo": "2026-2", "asignatura": "Bases de Datos", "creditos": 3, "corte1": 3.6, "corte2": 3.4, "corte3": 3.8, "definitiva": 3.6 },
+  { "estudianteId": "E-002", "periodo": "2026-2", "asignatura": "Física Mecánica", "creditos": 2, "corte1": 2.5, "corte2": 2.7, "corte3": 2.6, "definitiva": 2.6 },
+
+  { "estudianteId": "E-003", "periodo": "2026-2", "asignatura": "Contabilidad General", "creditos": 4, "corte1": 4.0, "corte2": 4.2, "corte3": 4.4, "definitiva": 4.2 },
+  { "estudianteId": "E-003", "periodo": "2026-2", "asignatura": "Microeconomía", "creditos": 3, "corte1": 3.7, "corte2": 3.9, "corte3": 3.8, "definitiva": 3.8 },
+  { "estudianteId": "E-003", "periodo": "2026-2", "asignatura": "Estadística Descriptiva", "creditos": 3, "corte1": 3.3, "corte2": 3.5, "corte3": 3.4, "definitiva": 3.4 }
+]

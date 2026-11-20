@@ -1,0 +1,15 @@
+[
+  { "estudianteId": "E-001", "periodo": "2026-2", "asignatura": "Estructuras de Datos", "sesionesProgramadas": 48, "inasistencias": 2 },
+  { "estudianteId": "E-001", "periodo": "2026-2", "asignatura": "Álgebra Lineal", "sesionesProgramadas": 48, "inasistencias": 9 },
+  { "estudianteId": "E-001", "periodo": "2026-2", "asignatura": "Bases de Datos", "sesionesProgramadas": 48, "inasistencias": 1 },
+  { "estudianteId": "E-001", "periodo": "2026-2", "asignatura": "Física Mecánica", "sesionesProgramadas": 32, "inasistencias": 3 },
+
+  { "estudianteId": "E-002", "periodo": "2026-2", "asignatura": "Estructuras de Datos", "sesionesProgramadas": 48, "inasistencias": 11 },
+  { "estudianteId": "E-002", "periodo": "2026-2", "asignatura": "Álgebra Lineal", "sesionesProgramadas": 48, "inasistencias": 4 },
+  { "estudianteId": "E-002", "periodo": "2026-2", "asignatura": "Bases de Datos", "sesionesProgramadas": 48, "inasistencias": 8 },
+  { "estudianteId": "E-002", "periodo": "2026-2", "asignatura": "Física Mecánica", "sesionesProgramadas": 32, "inasistencias": 5 },
+
+  { "estudianteId": "E-003", "periodo": "2026-2", "asignatura": "Contabilidad General", "sesionesProgramadas": 48, "inasistencias": 1 },
+  { "estudianteId": "E-003", "periodo": "2026-2", "asignatura": "Microeconomía", "sesionesProgramadas": 48, "inasistencias": 3 },
+  { "estudianteId": "E-003", "periodo": "2026-2", "asignatura": "Estadística Descriptiva", "sesionesProgramadas": 48, "inasistencias": 2 }
+]

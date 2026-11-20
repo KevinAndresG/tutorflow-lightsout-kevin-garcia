@@ -1,0 +1,6 @@
+[
+  { "id": "E-001", "nombre": "Ana María Rodríguez Pérez", "programa": "Ingeniería de Sistemas", "semestre": 4 },
+  { "id": "E-002", "nombre": "Brayan Steven Gómez Torres", "programa": "Ingeniería de Sistemas", "semestre": 4 },
+  { "id": "E-003", "nombre": "Camila Fernanda Ortiz Rojas", "programa": "Administración de Empresas", "semestre": 3 },
+  { "id": "E-004", "nombre": "Diego Alejandro Vargas Salazar", "programa": "Ingeniería de Sistemas", "semestre": 1 }
+]
