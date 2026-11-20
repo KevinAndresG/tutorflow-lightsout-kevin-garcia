@@ -46,3 +46,31 @@ La regla de fondo: **el código decide los permisos antes de llamar al modelo**.
 - **Cuando** el modelo intenta llamar `consultar_notas` con un id que el usuario no puede ver
 - **Entonces** la herramienta no devuelve datos y la petición termina en 403
 - Criterios: CA-05, CA-07, CA-11
+
+### ESC-03.8 · Nombre propio con nombre de pila repetido
+- **Dado** un estudiante cuyo nombre de pila coincide con el de otro estudiante (por ejemplo "Alicia Prueba Uno" y "Alicia")
+- **Cuando** pregunta nombrándose con su nombre completo exacto: "Soy Alicia Prueba Uno, ¿cómo voy en mis notas?"
+- **Entonces** responde 200 con sus propios datos
+- **Pero cuando** pregunta usando solo "Alicia" sin su nombre completo
+- **Entonces** responde 403, porque es ambiguo
+- Criterios: CA-04, CA-05
+
+### ESC-03.9 · Variantes de escritura de otro estudiante
+- **Dado** que Ana es estudiante válida y existe otra estudiante llamada "María José"
+- **Cuando** pregunta por "Maria Jose" (sin tilde, sin guion) o por "MARÍA-JOSÉ"
+- **Entonces** responde 403 y no consulta datos
+- Criterios: CA-05, CA-11
+
+### ESC-03.10 · Un registro incompleto no da privilegios
+- **Dado** un registro de estudiante al que le falta un campo
+- **Cuando** alguien se identifica con rol `coordinador` y el id de ese estudiante
+- **Entonces** responde 403; nunca lo trata como coordinador
+- **Y** si los datos de usuarios son inconsistentes (formas mezcladas o un id en dos roles), la aplicación no arranca
+- Criterios: CA-08
+
+### ESC-03.11 · Evasiones que el filtro no ve
+- **Dado** que Ana es estudiante válida
+- **Cuando** pregunta por otro estudiante con un id escrito con homoglifos (por ejemplo "Е-002" con E cirílica) o solo con su apellido
+- **Entonces** si el filtro previo no lo detecta, el modelo termina pidiendo ese id real a una herramienta y recibe 403
+- **Y** ningún dato del otro estudiante aparece en la respuesta
+- Criterios: CA-05, CA-11

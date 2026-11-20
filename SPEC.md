@@ -66,6 +66,8 @@ Nadie más existe. Un `id` que no está en los datos, o que no corresponde al ro
 
 **RN-13 · Llaves fuera del repositorio.** La llave del modelo llega solo por la variable `LLM_API_KEY`. Nunca se escribe en código, configuración versionada ni logs.
 
+**RN-14 · Datos inconsistentes fallan cerrado.** Ningún permiso se deduce de la ausencia de un dato. Si los datos de usuarios son inconsistentes (archivos con registros de formas mezcladas, o un mismo id en dos roles), la aplicación no arranca.
+
 ---
 
 ## 4. Contrato de la API (obligatorio, no se modifica)
@@ -171,8 +173,12 @@ Cada criterio tiene al menos un escenario en `/escenarios` y al menos una prueba
 ## 8. Riesgos conocidos
 
 - **Identidad declarada por el cliente.** El contrato recibe rol e id en el cuerpo, sin autenticación. Cualquiera puede decir ser otro usuario. Lo acepto porque el contrato lo exige; en producción el usuario saldría de un token firmado y nunca del cuerpo.
-- **Detección de terceros por nombre.** Detectar que una pregunta menciona a otro estudiante se hace comparando contra ids y nombres conocidos. Un apodo o una descripción indirecta puede pasar el primer filtro; por eso las herramientas validan de nuevo (RN-07).
+- **Detección de terceros por nombre.** Detectar que una pregunta menciona a otro estudiante se hace comparando contra ids y nombres conocidos. Un apodo o una descripción indirecta puede pasar el primer filtro; por eso las herramientas validan de nuevo (RN-07). Apellidos sueltos, nombres partidos ("Bra yan"), homoglifos, dígitos de otros alfabetos y ids pegados a letras también pueden pasar el filtro, y un nombre de pila que sea una palabra común ("Paz", "Luz") puede dar un 403 de más. Se acepta porque la validación en las herramientas impide la fuga y tiene pruebas propias.
 - **Dependencia del proveedor.** Si el modelo no responde, la API devuelve 503 en lugar de inventar.
+
+### Pendientes cuando lleguen los datos reales
+- Revisar si algún nombre de pila es una palabra común y si vale la pena una excepción.
+- Confirmar qué campo distingue a estudiantes de coordinadores, o si los coordinadores siquiera vienen en los datos. Hoy un archivo entero de estudiantes sin ese campo se cargaría como coordinadores.
 
 ---
 
@@ -183,6 +189,9 @@ Cada criterio tiene al menos un escenario en `/escenarios` y al menos una prueba
 | ¿Qué es un "usuario que pide datos que no le corresponden"? | Pedir datos de otro estudiante, de otro programa, o identificarse con un id inválido. | Es la lectura más estricta y la más segura. |
 | ¿403 o respuesta amable cuando un estudiante pide notas de otro? | 403, sin llamar al modelo. | El contrato lo pide explícitamente y evita gastar tokens. |
 | ¿Cómo se escribe `documento`? | Nombre del archivo entregado. | Es el identificador estable que cualquier prueba externa puede verificar. |
+| Un usuario se nombra a sí mismo y su nombre de pila se repite en otro estudiante | Su nombre completo exacto y su propio id no cuentan como mención de un tercero. Un nombre de pila suelto que coincide con otro estudiante da 403. | Las herramientas validan de nuevo, así que se evitan falsos rechazos sin abrir fugas. El caso ambiguo se rechaza. |
+| ¿Cómo se comparan los nombres? | Sin distinguir mayúsculas, tildes ni guiones ("María-José" equivale a "Maria Jose"). | Es la variación de escritura más común y es barata de cubrir. |
+| ¿Cómo se decide si un registro es estudiante o coordinador? | Por la forma consistente de su archivo, nunca por la ausencia de un campo. Si hay formas mezcladas o un id en ambos roles, el arranque falla. | Un dato incompleto no puede dar privilegios (RN-14). |
 | Coordinador pregunta solo por reglamento | Se responde normal, `usoDatosEstudiante: false`. | Un coordinador también tiene dudas de norma. |
 | Sin `LLM_API_KEY` | `/api/salud` sigue en 200; preguntar devuelve 503. | La salud del servicio no depende de un tercero. |
 | Proveedor del modelo | Dos adaptadores: formato OpenAI (Gemini, Groq, OpenAI, Ollama) y Anthropic nativo, elegidos con `LLM_PROVIDER`. | Permite usar un plan gratuito, un modelo local o Claude sin cambiar código. La API de Anthropic nativa permite caché de prompt, útil porque el reglamento se repite en cada pregunta. |
