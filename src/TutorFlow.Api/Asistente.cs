@@ -23,6 +23,9 @@ public class MedicionUso
     // Total acotado: nunca negativo ni mayor que int.MaxValue (sin envolver).
     public int Total => (int)Math.Clamp(TokensEntrada + TokensSalida, 0L, int.MaxValue);
     public List<string> Ids { get; } = [];
+    // Modelo pedido (null si no se llegó a llamar al modelo) y modelos distintos que respondieron, en orden.
+    public string? ModeloPedido { get; set; }
+    public List<string> ModelosRespondidos { get; } = [];
 }
 
 public class Asistente(Reglamento reglamento, Datos datos, ILlmClient llm)
@@ -57,11 +60,13 @@ public class Asistente(Reglamento reglamento, Datos datos, ILlmClient llm)
         {
         for (var vuelta = 0; vuelta < MaxVueltas; vuelta++)
         {
+            medicion.ModeloPedido ??= llm.ModeloEfectivo();
             var r = await llm.CompletarAsync(sistema, mensajes, Definiciones, ct);
             long te = Math.Max(0, r.Uso.TokensEntrada), ts = Math.Max(0, r.Uso.TokensSalida);
             tokens += te + ts;
             medicion.TokensEntrada += te;
             medicion.TokensSalida += ts;
+            if (!string.IsNullOrWhiteSpace(r.Modelo) && !medicion.ModelosRespondidos.Contains(r.Modelo)) medicion.ModelosRespondidos.Add(r.Modelo);
 
             if (r.Llamadas.Count == 0)
             {

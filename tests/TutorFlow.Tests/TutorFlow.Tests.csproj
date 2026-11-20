@@ -16,6 +16,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\TutorFlow.Api\TutorFlow.Api.csproj" />
+    <ProjectReference Include="..\..\evals\TutorFlow.Evals.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\fixtures\**\*" Link="fixtures\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />

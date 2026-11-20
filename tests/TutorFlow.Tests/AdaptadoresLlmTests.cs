@@ -108,7 +108,7 @@ public class AdaptadoresLlmTests
         Assert.Contains("application/json", p.Cabecera("Content-Type"));
 
         var j = p.Json;
-        Assert.Equal("gemini-2.5-flash", (string?)j["model"]);
+        Assert.Equal("gemini-3.5-flash", (string?)j["model"]);
         var msgs = j["messages"]!.AsArray();
         Assert.Equal(2, msgs.Count);
         Assert.Equal("system", (string?)msgs[0]!["role"]);

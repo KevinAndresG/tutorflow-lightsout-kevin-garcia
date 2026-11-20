@@ -35,7 +35,8 @@ public record Precios(double EntradaMtok, double SalidaMtok)
 public record RegistroAuditoria(
     string? Rol, string? Id, string? Pregunta,
     IReadOnlyList<string> EstudiantesConsultados, IReadOnlyList<Cita> Citas,
-    int Codigo, int Tokens, double CostoUsd);
+    int Codigo, int Tokens, double CostoUsd,
+    string? ModeloPedido = null, IReadOnlyList<string>? ModelosRespondidos = null, long TokensEntrada = 0, long TokensSalida = 0);
 
 // Una línea JSON por pregunta. Un fallo al escribir nunca tumba la petición.
 public class Auditoria(IConfiguration cfg, ILogger<Auditoria> logger)
@@ -73,6 +74,10 @@ public class Auditoria(IConfiguration cfg, ILogger<Auditoria> logger)
                 codigo = r.Codigo,
                 tokens = r.Tokens,
                 costoUsd = r.CostoUsd,
+                modeloPedido = r.ModeloPedido,
+                modelosRespondidos = (r.ModelosRespondidos ?? []).ToList(),
+                tokensEntrada = Math.Max(0, r.TokensEntrada),
+                tokensSalida = Math.Max(0, r.TokensSalida),
             }, Opciones);
         }
         catch (Exception e)

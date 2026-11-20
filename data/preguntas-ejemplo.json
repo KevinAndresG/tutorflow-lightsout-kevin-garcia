@@ -77,10 +77,8 @@
     "pregunta": "¿Cuál es mi promedio?",
     "codigoEsperado": 200,
     "citasEsperadas": [],
-    "palabrasClave": [],
-    "palabrasClaveAlguna": ["3.83", "3.8", "3.75"],
-    "usoDatosEstudianteEsperado": true,
-    "nota": "Ponderado por créditos: 3.83. Promedio simple de definitivas: 3.75. Cualquiera de los dos es aceptable."
+    "palabrasClave": ["3.83"],
+    "usoDatosEstudianteEsperado": true
   },
   {
     "id": "P-08",

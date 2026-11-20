@@ -10,11 +10,13 @@ public class AnthropicClient(IHttpClientFactory fabrica, IConfiguration cfg) : I
     public const string ModeloDefecto = "claude-haiku-4-5";
     const int MaxTokens = 2048;
 
+    public string? ModeloEfectivo() => string.IsNullOrWhiteSpace(cfg["LLM_MODEL"]) ? ModeloDefecto : cfg["LLM_MODEL"]!.Trim();
+
     public async Task<LlmRespuesta> CompletarAsync(string sistema, IReadOnlyList<LlmMensaje> mensajes,
         IReadOnlyList<LlmHerramienta> herramientas, CancellationToken ct)
     {
         var baseUrl = (string.IsNullOrWhiteSpace(cfg["LLM_BASE_URL"]) ? BaseDefecto : cfg["LLM_BASE_URL"]!).TrimEnd('/');
-        var modelo = string.IsNullOrWhiteSpace(cfg["LLM_MODEL"]) ? ModeloDefecto : cfg["LLM_MODEL"]!;
+        var modelo = ModeloEfectivo()!;
 
         var msgs = new JsonArray();
         JsonArray? resultados = null; // bloques tool_result consecutivos
@@ -96,7 +98,8 @@ public class AnthropicClient(IHttpClientFactory fabrica, IConfiguration cfg) : I
             var uso = raiz.TryGetProperty("usage", out var u) ? u : default;
             var entrada = LlmHttp.Entero(uso, "input_tokens") + LlmHttp.Entero(uso, "cache_creation_input_tokens")
                           + LlmHttp.Entero(uso, "cache_read_input_tokens");
-            return new(texto.Length > 0 ? texto.ToString() : null, llamadas, new(entrada, LlmHttp.Entero(uso, "output_tokens")));
+            return new(texto.Length > 0 ? texto.ToString() : null, llamadas, new(entrada, LlmHttp.Entero(uso, "output_tokens")),
+                raiz.TryGetProperty("model", out var mo) && mo.ValueKind == JsonValueKind.String ? mo.GetString() : null);
         }
         catch (Exception e) when (e is KeyNotFoundException or InvalidOperationException)
         {

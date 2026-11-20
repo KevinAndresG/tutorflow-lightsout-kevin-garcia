@@ -155,7 +155,8 @@ app.MapPost("/api/asistente/preguntar", async (HttpRequest req, Datos datos, ICo
     finally
     {
         auditoria.Registrar(new RegistroAuditoria(rolAud, idAud, preguntaAud, medicion.Ids.ToList(), citasAud, codigo,
-            medicion.Total, precios.Costo(medicion.TokensEntrada, medicion.TokensSalida)));
+            medicion.Total, precios.Costo(medicion.TokensEntrada, medicion.TokensSalida),
+            medicion.ModeloPedido, medicion.ModelosRespondidos.ToList(), medicion.TokensEntrada, medicion.TokensSalida));
     }
 });
 

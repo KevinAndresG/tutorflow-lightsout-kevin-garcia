@@ -3,7 +3,11 @@ obj/
 node_modules/
 dist/
 .env
+.env.*
+!.env.example
 **/logs/auditoria*
 *.user
 .vs/
 Prueba técnica - senior full Stack con IA.pdf
+
+evals/resultados/
