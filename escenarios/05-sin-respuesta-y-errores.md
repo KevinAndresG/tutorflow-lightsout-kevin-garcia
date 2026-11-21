@@ -54,3 +54,9 @@
 - **Cuando** llega a `POST /api/asistente/preguntar`
 - **Entonces** responde 400 sin llamar al modelo
 - Criterios: CA-09
+
+### ESC-05.9 · Escape Unicode inválido
+- **Dado** una petición con JSON válido, pero con un escape como `\ud800` suelto en cualquier campo (el texto decodificado no es Unicode válido)
+- **Cuando** llega a `POST /api/asistente/preguntar`
+- **Entonces** responde 400 sin llamar al modelo
+- Criterios: CA-09
