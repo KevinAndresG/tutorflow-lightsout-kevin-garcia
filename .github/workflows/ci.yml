@@ -110,6 +110,7 @@ jobs:
         env:
           EVALS_PAUSA_MS: ${{ vars.EVALS_PAUSA_MS || '20000' }}
           EVALS_ESPERA_MS: ${{ vars.EVALS_ESPERA_MS || '20000' }}
+          EVALS_CONJUNTO: ${{ vars.EVALS_CONJUNTO || 'ejemplo' }}
         run: dotnet run --no-build -c Release --project evals
       - name: Subir resultados
         if: always()

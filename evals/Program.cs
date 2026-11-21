@@ -49,6 +49,14 @@ var llave = Environment.GetEnvironmentVariable("LLM_API_KEY"); // solo para R2; 
 if (string.IsNullOrEmpty(llave))
     Console.WriteLine("ADVERTENCIA: LLM_API_KEY no está definida en el entorno del runner; la regla de no filtrar la llave no se puede comprobar.");
 
+// EVALS_CONJUNTO: "todos" (por defecto) = ejemplo + adicionales; "ejemplo" = solo data/preguntas-ejemplo.json.
+var conjunto = Environment.GetEnvironmentVariable("EVALS_CONJUNTO") is { Length: > 0 } cj ? cj.Trim() : "todos";
+if (conjunto is not ("todos" or "ejemplo"))
+{
+    Console.Error.WriteLine($"EVALS_CONJUNTO desconocido: '{conjunto}'. Valores válidos: todos, ejemplo.");
+    return 2;
+}
+
 var casos = new List<Caso>();
 void CargarCasos(string ruta)
 {
@@ -60,7 +68,7 @@ try
 {
     CargarCasos(Path.Combine(dataDir, "preguntas-ejemplo.json"));
     var extra = Path.Combine(evalsDir, "casos-adicionales.json");
-    if (File.Exists(extra)) CargarCasos(extra);
+    if (conjunto == "todos" && File.Exists(extra)) CargarCasos(extra);
     corpus = Corpus.Cargar(dataDir);
 }
 catch (Exception ex) when (ex is JsonException or InvalidDataException or IOException)
@@ -71,6 +79,7 @@ catch (Exception ex) when (ex is JsonException or InvalidDataException or IOExce
 using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
 var resultados = new List<ResultadoCaso>();
 
+Console.WriteLine($"Conjunto: {conjunto} ({casos.Count} casos)");
 Console.WriteLine($"Evals contra {url}: {casos.Count} casos");
 Console.WriteLine($"Archivo de auditoría: {rutaAud}");
 for (var i = 0; i < casos.Count; i++)
@@ -148,6 +157,6 @@ ImprimirSinResultado(um.Resto);
 
 Directory.CreateDirectory(Path.Combine(evalsDir, "resultados"));
 File.WriteAllText(Path.Combine(evalsDir, "resultados", "ultimo.json"),
-    JsonSerializer.Serialize(new { fecha = DateTime.UtcNow, veredicto, resumen, modelo = um, casos = resultados },
+    JsonSerializer.Serialize(new { fecha = DateTime.UtcNow, conjunto, veredicto, resumen, modelo = um, casos = resultados },
         new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
 return resumen.CodigoSalida;
