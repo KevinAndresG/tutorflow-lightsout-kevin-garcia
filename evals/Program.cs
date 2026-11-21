@@ -72,6 +72,7 @@ using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
 var resultados = new List<ResultadoCaso>();
 
 Console.WriteLine($"Evals contra {url}: {casos.Count} casos");
+Console.WriteLine($"Archivo de auditoría: {rutaAud}");
 for (var i = 0; i < casos.Count; i++)
 {
     var caso = casos[i];
@@ -134,10 +135,14 @@ Console.WriteLine($"  MODELO DISTINTO: {um.ModeloDistinto} preguntas");
 Console.WriteLine($"  Precios USD/Mtok: entrada {um.PrecioEntradaMtok}, salida {um.PrecioSalidaMtok}");
 void Imprimir(string nombre, GrupoUso g) =>
     Console.WriteLine($"  {nombre}: {g.ConRespuesta} con respuesta del modelo de {g.Preguntas} en el grupo ({g.SinResultado} sin resultado, excluidas del promedio) | tokens entrada {g.TokensEntrada}, salida {g.TokensSalida}, total {g.Tokens}, promedio {g.TokensPromedio:F1} | costo total {g.CostoTotalUsd:F6} USD, estimado por 1.000 preguntas {g.CostoPor1000Usd:F4} USD");
+void ImprimirSinResultado(GrupoUso g) =>
+    Console.WriteLine($"      gastado en sin resultado: {g.SinResultado} preguntas, tokens {g.TokensSinResultado}, costo {g.CostoSinResultadoUsd:F6} USD (incluido en el total, fuera del promedio)");
 Imprimir("(a) Terminaron en 403", um.Rechazadas403);
+ImprimirSinResultado(um.Rechazadas403);
 if (um.Rechazadas403.ConTokens.Count > 0)
     Console.WriteLine($"      ATENCION: 403 con tokens > 0 (403 por herramienta tras llamar al modelo): {string.Join(", ", um.Rechazadas403.ConTokens)}");
 Imprimir("(b) Resto", um.Resto);
+ImprimirSinResultado(um.Resto);
 
 Directory.CreateDirectory(Path.Combine(evalsDir, "resultados"));
 File.WriteAllText(Path.Combine(evalsDir, "resultados", "ultimo.json"),

@@ -20,6 +20,10 @@ public sealed class GrupoUso
     public double TokensPromedio { get; set; }
     public double CostoTotalUsd { get; set; }
     public double CostoPor1000Usd { get; set; }
+    /// <summary>Tokens gastados en preguntas SIN RESULTADO (incluidos en Tokens, excluidos del promedio).</summary>
+    public long TokensSinResultado { get; set; }
+    /// <summary>Costo gastado en preguntas SIN RESULTADO (incluido en CostoTotalUsd, excluido del estimado por 1.000).</summary>
+    public double CostoSinResultadoUsd { get; set; }
     public List<string> ConTokens { get; set; } = new();
 }
 
@@ -140,10 +144,14 @@ public static class UsoModelo
         g.SinResultado = rs.Count(x => x.Estado == Estado.SinResultado);
         // Denominador: solo las que obtuvieron respuesta del modelo; las SIN RESULTADO (0 tokens) subestimarían el promedio.
         g.ConRespuesta = rs.Count(x => x.Estado != Estado.SinResultado && (x.TokensUso > 0 || x.Codigo == 200));
+        var sin = rs.Where(x => x.Estado == Estado.SinResultado).ToList();
+        g.TokensSinResultado = sin.Sum(x => x.TokensUso);
+        g.CostoSinResultadoUsd = sin.Sum(x => x.CostoUsoUsd);
         if (g.ConRespuesta > 0)
         {
-            g.TokensPromedio = (double)g.Tokens / g.ConRespuesta;
-            g.CostoPor1000Usd = g.CostoTotalUsd / g.ConRespuesta * 1000;
+            // Numerador y denominador sobre el mismo conjunto: las preguntas con respuesta del modelo.
+            g.TokensPromedio = (double)(g.Tokens - g.TokensSinResultado) / g.ConRespuesta;
+            g.CostoPor1000Usd = (g.CostoTotalUsd - g.CostoSinResultadoUsd) / g.ConRespuesta * 1000;
         }
         g.ConTokens = rs.Where(x => x.TokensUso > 0).Select(x => x.Id).ToList();
         return g;
