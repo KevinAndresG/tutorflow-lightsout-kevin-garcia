@@ -73,6 +73,7 @@ jobs:
   evals:
     needs: pruebas
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
       LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
@@ -106,6 +107,9 @@ jobs:
           done
           echo "La API no arrancó."; tail -n 50 api.log; exit 1
       - name: Evals
+        env:
+          EVALS_PAUSA_MS: ${{ vars.EVALS_PAUSA_MS || '20000' }}
+          EVALS_ESPERA_MS: ${{ vars.EVALS_ESPERA_MS || '20000' }}
         run: dotnet run --no-build -c Release --project evals
       - name: Subir resultados
         if: always()
