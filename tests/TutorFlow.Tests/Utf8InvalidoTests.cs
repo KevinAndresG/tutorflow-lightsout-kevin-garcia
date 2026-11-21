@@ -134,26 +134,19 @@ public class Utf8InvalidoTests
     }
 
     /// <summary>
-    /// Byte inválido solo en una propiedad desconocida. Comportamiento real documentado: JsonDocument.ParseAsync no
-    /// valida el UTF-8 de las cadenas hasta que se leen con GetString; la propiedad desconocida nunca se lee, así que la
-    /// petición se procesa como válida (200, modelo llamado una vez). No hay fuga: el valor ignorado no llega a la
-    /// respuesta ni a la auditoría. Si esto cambiara a 400 (validación estricta del cuerpo), la prueba debe revisarse a
-    /// conciencia, no ajustarse en silencio.
+    /// ESC-05.8 (SPEC RN-09): un byte inválido en una propiedad que la API no lee también es entrada inválida. Decisión
+    /// aprobada por el humano: antes se toleraba (200); ahora el cuerpo entero debe ser UTF-8 válido -> 400, sin llamar al
+    /// modelo, con una línea de auditoría de código 400. El valor ignorado no aparece en la respuesta ni en la auditoría.
     /// </summary>
     [Fact]
-    public async Task ESC_09_UTF8_byte_invalido_solo_en_propiedad_desconocida_se_ignora_y_da_200_documentado()
+    public async Task ESC_05_8_byte_invalido_solo_en_propiedad_desconocida_da_400_sin_llamar_al_modelo()
     {
         var llm = ModeloOk();
         using var e = new EntornoAuditoria(llm);
         var cuerpo = Unir(Ascii("{\"extra\":\"" + Marcador + " "), [0xBF, 0xF3],
             Ascii("\",\"pregunta\":\"Hola\",\"usuario\":{\"rol\":\"estudiante\",\"id\":\"T-E1\"}}"));
         var (c, b) = await Enviar(e, cuerpo);
-        Assert.Equal(HttpStatusCode.OK, c);
-        Assert.DoesNotContain(Marcador, b);
-        Assert.Equal(1, llm.Llamadas);
-        var l = await e.UnaLinea();
-        AssertForma(l);
-        Assert.Equal(200, Codigo(l));
+        await Verifica400(e, llm, c, b);
         Assert.DoesNotContain(Marcador, e.TextoAuditoria());
     }
 

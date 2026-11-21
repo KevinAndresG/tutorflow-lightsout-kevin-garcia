@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using TutorFlow.Api;
 using TutorFlow.Api.Llm;
@@ -13,6 +14,33 @@ static string ResolverRuta(string? configurada)
     return Path.GetFullPath("data");
 }
 
+// Recorre los escapes \uXXXX del cuerpo: un sustituto alto sin bajo detrás, o un bajo sin alto delante, es inválido.
+static bool TieneSustitutoSuelto(string t)
+{
+    var altoPendiente = false;
+    for (var i = 0; i < t.Length; i++)
+    {
+        if (t[i] != '\\') { if (altoPendiente) return true; continue; }
+        if (i + 1 < t.Length && t[i + 1] == 'u' && i + 5 < t.Length
+            && int.TryParse(t.AsSpan(i + 2, 4), System.Globalization.NumberStyles.AllowHexSpecifier,
+                System.Globalization.CultureInfo.InvariantCulture, out var cu))
+        {
+            var alto = cu is >= 0xD800 and <= 0xDBFF;
+            var bajo = cu is >= 0xDC00 and <= 0xDFFF;
+            if (altoPendiente && !bajo) return true;
+            if (bajo && !altoPendiente) return true;
+            altoPendiente = alto;
+            i += 5;
+        }
+        else
+        {
+            if (altoPendiente) return true;
+            i++; // otro escape (\n, \\, \"): salta el carácter escapado
+        }
+    }
+    return altoPendiente;
+}
+
 var ruta = ResolverRuta(builder.Configuration["Datos:Ruta"]);
 builder.Services.AddSingleton(_ => new Reglamento(Path.Combine(ruta, "reglamento")));
 builder.Services.AddSingleton(_ => new Datos(Path.Combine(ruta, "api")));
@@ -21,15 +49,8 @@ builder.Services.AddHttpClient("llm", c => c.Timeout = TimeSpan.FromSeconds(60))
 builder.Services.AddSingleton(sp => Precios.Desde(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<Auditoria>();
 builder.Services.AddSingleton<ILlmClient>(sp =>
-{
-    var cfg = sp.GetRequiredService<IConfiguration>();
-    var proveedor = (cfg["LLM_PROVIDER"] ?? "").Trim();
-    if (proveedor.Length == 0 || proveedor.Equals("openai", StringComparison.OrdinalIgnoreCase))
-        return ActivatorUtilities.CreateInstance<OpenAiCompatClient>(sp);
-    if (proveedor.Equals("anthropic", StringComparison.OrdinalIgnoreCase))
-        return ActivatorUtilities.CreateInstance<AnthropicClient>(sp);
-    throw new InvalidOperationException("LLM_PROVIDER no es válido: use 'openai' o 'anthropic'.");
-});
+    Proveedores.CrearCliente(sp.GetRequiredService<IHttpClientFactory>(), sp.GetRequiredService<IConfiguration>(), "LLM_"));
+builder.Services.AddSingleton(Proveedores.Desde);
 builder.Services.AddSingleton<Asistente>();
 
 var app = builder.Build();
@@ -39,11 +60,12 @@ app.Services.GetRequiredService<Reglamento>();
 app.Services.GetRequiredService<Datos>();
 app.Services.GetRequiredService<ILlmClient>();
 app.Services.GetRequiredService<Precios>();
+app.Services.GetRequiredService<Proveedores>();
 
 app.MapGet("/api/salud", () => Results.Json(new { estado = "ok" }));
 
 app.MapPost("/api/asistente/preguntar", async (HttpRequest req, Datos datos, IConfiguration cfg, Asistente asistente,
-    Auditoria auditoria, Precios precios, ILogger<Program> log) =>
+    Auditoria auditoria, ILogger<Program> log) =>
 {
     // Un solo punto de registro: el finally cubre toda ruta de salida.
     string? rolAud = null, idAud = null, preguntaAud = null;
@@ -74,6 +96,12 @@ app.MapPost("/api/asistente/preguntar", async (HttpRequest req, Datos datos, ICo
                 if (ms.Length + n > MaxCuerpo) return Error(400, "El cuerpo es demasiado grande.");
                 ms.Write(buf, 0, n);
             }
+            // Un byte inválido en cualquier campo, usado o no, invalida todo el cuerpo.
+            if (!System.Text.Unicode.Utf8.IsValid(ms.GetBuffer().AsSpan(0, (int)ms.Length)))
+                return Error(400, "El cuerpo no es un JSON válido.");
+            // GetString no falla con un escape \ud800 suelto (lo sustituye en silencio): se rechaza aquí.
+            if (TieneSustitutoSuelto(Encoding.UTF8.GetString(ms.GetBuffer(), 0, (int)ms.Length)))
+                return Error(400, "El cuerpo no es un JSON válido.");
             ms.Position = 0;
             doc = await JsonDocument.ParseAsync(ms);
         }
@@ -147,7 +175,7 @@ app.MapPost("/api/asistente/preguntar", async (HttpRequest req, Datos datos, ICo
                 citas = res.Citas.Select(c => new { documento = c.Documento, seccion = c.Seccion }),
                 usoDatosEstudiante = res.UsoDatosEstudiante,
                 tokens = medicion.Total,
-                costoUsd = precios.Costo(medicion.TokensEntrada, medicion.TokensSalida),
+                costoUsd = medicion.CostoUsd,
             });
         }
     }
@@ -164,8 +192,9 @@ app.MapPost("/api/asistente/preguntar", async (HttpRequest req, Datos datos, ICo
     finally
     {
         auditoria.Registrar(new RegistroAuditoria(rolAud, idAud, preguntaAud, medicion.Ids.ToList(), citasAud, codigo,
-            medicion.Total, precios.Costo(medicion.TokensEntrada, medicion.TokensSalida),
-            medicion.ModeloPedido, medicion.ModelosRespondidos.ToList(), medicion.TokensEntrada, medicion.TokensSalida));
+            medicion.Total, medicion.CostoUsd,
+            medicion.ModeloPedido, medicion.ModelosRespondidos.ToList(), medicion.TokensEntrada, medicion.TokensSalida,
+            medicion.Proveedor, medicion.Intentos.ToList()));
     }
 });
 

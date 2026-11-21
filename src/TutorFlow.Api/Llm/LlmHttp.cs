@@ -5,7 +5,13 @@ using System.Text.Json.Nodes;
 namespace TutorFlow.Api.Llm;
 
 // Falla del proveedor. El mensaje nunca incluye llaves, cuerpos ni cabeceras.
-public class LlmException(string mensaje) : Exception(mensaje);
+public class LlmException(string mensaje, LlmCausa causa = LlmCausa.Otro) : Exception(mensaje)
+{
+    public LlmCausa Causa { get; } = causa;
+}
+
+// Solo las causas que justifican saltar al siguiente proveedor tienen valor propio.
+public enum LlmCausa { Otro, Http429, Http503, Tiempo }
 
 static class LlmHttp
 {
@@ -16,13 +22,14 @@ static class LlmHttp
         {
             using var resp = await http.SendAsync(req, ct);
             if (!resp.IsSuccessStatusCode)
-                throw new LlmException($"El proveedor del modelo respondió {(int)resp.StatusCode}.");
+                throw new LlmException($"El proveedor del modelo respondió {(int)resp.StatusCode}.",
+                    (int)resp.StatusCode switch { 429 => LlmCausa.Http429, 503 => LlmCausa.Http503, _ => LlmCausa.Otro });
             var texto = await resp.Content.ReadAsStringAsync(ct);
             return JsonDocument.Parse(texto);
         }
         catch (LlmException) { throw; }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-        catch (OperationCanceledException) { throw new LlmException("El proveedor del modelo no respondió a tiempo."); }
+        catch (OperationCanceledException) { throw new LlmException("El proveedor del modelo no respondió a tiempo.", LlmCausa.Tiempo); }
         catch (JsonException) { throw new LlmException("El proveedor del modelo devolvió una respuesta no válida."); }
         catch (HttpRequestException) { throw new LlmException("No se pudo contactar al proveedor del modelo."); }
         // Cualquier otra excepción (p. ej. FormatException por cabeceras inválidas) puede llevar la llave en su mensaje.

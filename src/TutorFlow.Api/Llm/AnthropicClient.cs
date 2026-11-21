@@ -4,18 +4,18 @@ using System.Text.Json.Nodes;
 
 namespace TutorFlow.Api.Llm;
 
-public class AnthropicClient(IHttpClientFactory fabrica, IConfiguration cfg) : ILlmClient
+public class AnthropicClient(IHttpClientFactory fabrica, IConfiguration cfg, string prefijo = "LLM_") : ILlmClient
 {
     public const string BaseDefecto = "https://api.anthropic.com";
     public const string ModeloDefecto = "claude-haiku-4-5";
     const int MaxTokens = 2048;
 
-    public string? ModeloEfectivo() => string.IsNullOrWhiteSpace(cfg["LLM_MODEL"]) ? ModeloDefecto : cfg["LLM_MODEL"]!.Trim();
+    public string? ModeloEfectivo() => string.IsNullOrWhiteSpace(cfg[prefijo + "MODEL"]) ? ModeloDefecto : cfg[prefijo + "MODEL"]!.Trim();
 
     public async Task<LlmRespuesta> CompletarAsync(string sistema, IReadOnlyList<LlmMensaje> mensajes,
         IReadOnlyList<LlmHerramienta> herramientas, CancellationToken ct)
     {
-        var baseUrl = (string.IsNullOrWhiteSpace(cfg["LLM_BASE_URL"]) ? BaseDefecto : cfg["LLM_BASE_URL"]!).TrimEnd('/');
+        var baseUrl = (string.IsNullOrWhiteSpace(cfg[prefijo + "BASE_URL"]) ? BaseDefecto : cfg[prefijo + "BASE_URL"]!).TrimEnd('/');
         var modelo = ModeloEfectivo()!;
 
         var msgs = new JsonArray();
@@ -77,7 +77,7 @@ public class AnthropicClient(IHttpClientFactory fabrica, IConfiguration cfg) : I
         }
 
         using var req = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/v1/messages");
-        req.Headers.TryAddWithoutValidation("x-api-key", cfg["LLM_API_KEY"]?.Trim());
+        req.Headers.TryAddWithoutValidation("x-api-key", cfg[prefijo + "API_KEY"]?.Trim());
         req.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
         using var doc = await LlmHttp.EnviarAsync(fabrica.CreateClient("llm"), req, cuerpo, ct);
 

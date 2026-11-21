@@ -26,9 +26,15 @@ public class MedicionUso
     // Modelo pedido (null si no se llegó a llamar al modelo) y modelos distintos que respondieron, en orden.
     public string? ModeloPedido { get; set; }
     public List<string> ModelosRespondidos { get; } = [];
+    // Acumulados sobre todos los intentos con proveedores (principal y respaldos).
+    public double CostoUsd { get; set; }
+    public bool UsoDatos { get; set; }
+    // Proveedor que respondió ("principal" o "respaldo-N"); null si no hubo llamada o fallaron todos.
+    public string? Proveedor { get; set; }
+    public List<IntentoProveedor> Intentos { get; } = [];
 }
 
-public class Asistente(Reglamento reglamento, Datos datos, ILlmClient llm)
+public class Asistente(Reglamento reglamento, Datos datos, Proveedores proveedores)
 {
     public const string SinRespuesta = "No encuentro esa información en el reglamento ni en los datos disponibles";
     const int MaxVueltas = 6;
@@ -45,9 +51,46 @@ public class Asistente(Reglamento reglamento, Datos datos, ILlmClient llm)
             """{"type":"object","properties":{}}"""),
     ];
 
+    // Reintenta la pregunta completa con el siguiente proveedor solo ante 429, 503 o tiempo agotado del HttpClient.
+    // Cualquier otra falla se propaga (503 al cliente). Cada intento se cobra al precio de su proveedor.
     public async Task<AsistenteResultado> ResponderAsync(Usuario usuario, string pregunta, CancellationToken ct, MedicionUso? medicion = null)
     {
         medicion ??= new MedicionUso();
+        var lista = proveedores.Lista;
+        for (var i = 0; i < lista.Count; i++)
+        {
+            var p = lista[i];
+            long antesE = medicion.TokensEntrada, antesS = medicion.TokensSalida;
+            medicion.ModeloPedido = null;
+            var resultado = "error";
+            try
+            {
+                var res = await ResponderConAsync(p.Cliente, usuario, pregunta, ct, medicion);
+                resultado = "ok";
+                medicion.Proveedor = p.Nombre;
+                return res with
+                {
+                    UsoDatosEstudiante = res.UsoDatosEstudiante || medicion.UsoDatos,
+                    IdsEstudiantesConsultados = medicion.Ids.ToList(),
+                    Tokens = medicion.Total,
+                };
+            }
+            catch (LlmException e)
+            {
+                resultado = e.Causa switch { LlmCausa.Http429 => "429", LlmCausa.Http503 => "503", LlmCausa.Tiempo => "tiempo", _ => "error" };
+                if (e.Causa == LlmCausa.Otro || i == lista.Count - 1) throw;
+            }
+            finally
+            {
+                medicion.CostoUsd += p.Precios.Costo(medicion.TokensEntrada - antesE, medicion.TokensSalida - antesS);
+                medicion.Intentos.Add(new IntentoProveedor(p.Nombre, resultado));
+            }
+        }
+        throw new LlmException("No hay proveedores del modelo configurados.");
+    }
+
+    async Task<AsistenteResultado> ResponderConAsync(ILlmClient llm, Usuario usuario, string pregunta, CancellationToken ct, MedicionUso medicion)
+    {
         var sistema = ConstruirSistema(usuario);
         var mensajes = new List<LlmMensaje> { new("user", $"<pregunta>{Neutralizar(pregunta)}</pregunta>") };
         var herramientas = new Herramientas(datos, usuario);
@@ -87,6 +130,7 @@ public class Asistente(Reglamento reglamento, Datos datos, ILlmClient llm)
         finally
         {
             foreach (var i in herramientas.IdsConsultados) if (!medicion.Ids.Contains(i)) medicion.Ids.Add(i);
+            if (herramientas.UsoDatos) medicion.UsoDatos = true;
         }
     }
 

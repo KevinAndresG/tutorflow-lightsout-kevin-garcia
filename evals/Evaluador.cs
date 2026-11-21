@@ -62,6 +62,8 @@ public sealed class ResultadoCaso
     public long TokensUso { get; set; }
     public double CostoUsoUsd { get; set; }
     public string? Advertencia { get; set; }
+    /// <summary>Proveedor que respondió según la auditoría ("principal" o "respaldo-N"); null si no hubo respuesta del modelo.</summary>
+    public string? Proveedor { get; set; }
 }
 
 public sealed class Resumen
@@ -82,6 +84,8 @@ public sealed class Resumen
     public double CostoPor1000Usd { get; set; }
     /// <summary>0 aprobada, 1 reprobada, 2 inconclusa.</summary>
     public int CodigoSalida { get; set; }
+    /// <summary>Casos cuya respuesta vino de un proveedor de respaldo: los evals miden un único proveedor.</summary>
+    public int RespondioRespaldo { get; set; }
 }
 
 /// <summary>Datos de referencia leídos de /data: índice de citas y personas. Nada va escrito en código.</summary>
@@ -330,8 +334,9 @@ public static class Evaluador
             s.CostoPromedioUsd = s.CostoTotalUsd / con.Count;
             s.CostoPor1000Usd = s.CostoPromedioUsd * 1000;
         }
+        s.RespondioRespaldo = rs.Count(x => x.Proveedor is { Length: > 0 } p && p != "principal");
         s.CodigoSalida = !s.ReglasDurasOk ? 1
-            : s.Total == 0 || s.SinResultado > 0 ? 2
+            : s.Total == 0 || s.SinResultado > 0 || s.RespondioRespaldo > 0 ? 2
             : s.Puntaje >= s.Umbral ? 0 : 1;
         return s;
     }

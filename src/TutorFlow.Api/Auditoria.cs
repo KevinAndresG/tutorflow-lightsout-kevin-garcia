@@ -7,8 +7,8 @@ namespace TutorFlow.Api;
 // Precio USD por millón de tokens. Ausente = 0; un valor no numérico o negativo impide arrancar.
 public record Precios(double EntradaMtok, double SalidaMtok)
 {
-    public static Precios Desde(IConfiguration cfg) =>
-        new(Leer(cfg, "LLM_PRECIO_ENTRADA_MTOK"), Leer(cfg, "LLM_PRECIO_SALIDA_MTOK"));
+    public static Precios Desde(IConfiguration cfg, string prefijo = "LLM_") =>
+        new(Leer(cfg, prefijo + "PRECIO_ENTRADA_MTOK"), Leer(cfg, prefijo + "PRECIO_SALIDA_MTOK"));
 
     static double Leer(IConfiguration cfg, string nombre)
     {
@@ -36,7 +36,11 @@ public record RegistroAuditoria(
     string? Rol, string? Id, string? Pregunta,
     IReadOnlyList<string> EstudiantesConsultados, IReadOnlyList<Cita> Citas,
     int Codigo, int Tokens, double CostoUsd,
-    string? ModeloPedido = null, IReadOnlyList<string>? ModelosRespondidos = null, long TokensEntrada = 0, long TokensSalida = 0);
+    string? ModeloPedido = null, IReadOnlyList<string>? ModelosRespondidos = null, long TokensEntrada = 0, long TokensSalida = 0,
+    string? Proveedor = null, IReadOnlyList<IntentoProveedor>? Intentos = null);
+
+// Un intento contra un proveedor. Resultado: "ok", "429", "503", "tiempo" o "error".
+public record IntentoProveedor(string Proveedor, string Resultado);
 
 // Una línea JSON por pregunta. Un fallo al escribir nunca tumba la petición.
 public class Auditoria(IConfiguration cfg, ILogger<Auditoria> logger)
@@ -57,9 +61,14 @@ public class Auditoria(IConfiguration cfg, ILogger<Auditoria> logger)
         string linea;
         try
         {
-            var llave = cfg["LLM_API_KEY"]?.Trim();
-            string? Limpiar(string? s) =>
-                s != null && !string.IsNullOrEmpty(llave) ? s.Replace(llave, "[REDACTADO]", StringComparison.Ordinal) : s;
+            var llaves = Llm.Proveedores.LlavesRespaldo(cfg).Append(cfg["LLM_API_KEY"]?.Trim())
+                .Where(l => !string.IsNullOrEmpty(l)).ToList();
+            string? Limpiar(string? s)
+            {
+                if (s == null) return s;
+                foreach (var llave in llaves) s = s.Replace(llave!, "[REDACTADO]", StringComparison.Ordinal);
+                return s;
+            }
 
             var pregunta = Limpiar(r.Pregunta);
             if (pregunta is { Length: > MaxPregunta }) pregunta = pregunta[..MaxPregunta];
@@ -78,6 +87,8 @@ public class Auditoria(IConfiguration cfg, ILogger<Auditoria> logger)
                 modelosRespondidos = (r.ModelosRespondidos ?? []).ToList(),
                 tokensEntrada = Math.Max(0, r.TokensEntrada),
                 tokensSalida = Math.Max(0, r.TokensSalida),
+                proveedor = r.Proveedor,
+                intentos = (r.Intentos ?? []).Select(i => new { proveedor = i.Proveedor, resultado = i.Resultado }).ToList(),
             }, Opciones);
         }
         catch (Exception e)

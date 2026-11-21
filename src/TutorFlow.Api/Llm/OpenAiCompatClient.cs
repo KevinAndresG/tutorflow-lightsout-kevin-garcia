@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 
 namespace TutorFlow.Api.Llm;
 
-public class OpenAiCompatClient(IHttpClientFactory fabrica, IConfiguration cfg) : ILlmClient
+public class OpenAiCompatClient(IHttpClientFactory fabrica, IConfiguration cfg, string prefijo = "LLM_") : ILlmClient
 {
     public const string BaseDefecto = "https://generativelanguage.googleapis.com/v1beta/openai";
     // gemini-2.5-flash ya no está disponible para cuentas nuevas; gemini-3.5-flash comprobado con la API real.
@@ -11,12 +11,12 @@ public class OpenAiCompatClient(IHttpClientFactory fabrica, IConfiguration cfg) 
     // Los modelos Gemini 3 gastan tokens de razonamiento antes de responder; con 2048 puede quedar sin texto visible.
     const int MaxTokens = 8192;
 
-    public string? ModeloEfectivo() => string.IsNullOrWhiteSpace(cfg["LLM_MODEL"]) ? ModeloDefecto : cfg["LLM_MODEL"]!.Trim();
+    public string? ModeloEfectivo() => string.IsNullOrWhiteSpace(cfg[prefijo + "MODEL"]) ? ModeloDefecto : cfg[prefijo + "MODEL"]!.Trim();
 
     public async Task<LlmRespuesta> CompletarAsync(string sistema, IReadOnlyList<LlmMensaje> mensajes,
         IReadOnlyList<LlmHerramienta> herramientas, CancellationToken ct)
     {
-        var baseUrl = (string.IsNullOrWhiteSpace(cfg["LLM_BASE_URL"]) ? BaseDefecto : cfg["LLM_BASE_URL"]!).TrimEnd('/');
+        var baseUrl = (string.IsNullOrWhiteSpace(cfg[prefijo + "BASE_URL"]) ? BaseDefecto : cfg[prefijo + "BASE_URL"]!).TrimEnd('/');
         var modelo = ModeloEfectivo()!;
 
         var msgs = new JsonArray { new JsonObject { ["role"] = "system", ["content"] = sistema } };
@@ -70,7 +70,7 @@ public class OpenAiCompatClient(IHttpClientFactory fabrica, IConfiguration cfg) 
         }
 
         using var req = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/chat/completions");
-        req.Headers.TryAddWithoutValidation("Authorization", "Bearer " + cfg["LLM_API_KEY"]?.Trim());
+        req.Headers.TryAddWithoutValidation("Authorization", "Bearer " + cfg[prefijo + "API_KEY"]?.Trim());
         using var doc = await LlmHttp.EnviarAsync(fabrica.CreateClient("llm"), req, cuerpo, ct);
 
         try

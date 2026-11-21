@@ -109,7 +109,7 @@ for (var i = 0; i < casos.Count; i++)
     var estado = res.Estado switch { Estado.Ok => "OK", Estado.Falla => "FALLA", _ => "SIN RESULTADO" };
     Console.WriteLine($"{res.Id,-8} {res.Escenario,-10} {estado,-13} {string.Join("; ", res.Motivos)}");
     var modeloTxt = res.AuditoriaEncontrada
-        ? $"  modelo pedido={res.ModeloPedido ?? "-"} respondido=[{string.Join(", ", res.ModelosRespondidos)}] http={res.Codigo?.ToString() ?? "-"} entrada={res.TokensEntrada} salida={res.TokensSalida} tokens={res.TokensUso} costo={res.CostoUsoUsd:F6}"
+        ? $"  modelo pedido={res.ModeloPedido ?? "-"} respondido=[{string.Join(", ", res.ModelosRespondidos)}] http={res.Codigo?.ToString() ?? "-"} proveedor={res.Proveedor ?? "-"} entrada={res.TokensEntrada} salida={res.TokensSalida} tokens={res.TokensUso} costo={res.CostoUsoUsd:F6}"
         : $"  modelo=desconocido http={res.Codigo?.ToString() ?? "-"} tokens={res.TokensUso} costo={res.CostoUsoUsd:F6} (ADVERTENCIA: sin línea de auditoría en {rutaAud})";
     Console.WriteLine(modeloTxt + (res.ModeloDistinto ? "  MODELO DISTINTO" : ""));
 }
@@ -122,6 +122,8 @@ Console.WriteLine($"Puntaje: {resumen.Puntaje:P1} (umbral {resumen.Umbral:P0})")
 Console.WriteLine($"Reglas duras (R1 citas, R2 privacidad/llave): {(resumen.ReglasDurasOk ? "OK" : "VIOLADAS")}");
 Console.WriteLine($"Tokens: total {resumen.TokensTotales}, promedio {resumen.TokensPromedio:F1} por pregunta con respuesta (sobre {resumen.ConRespuesta} respuestas 200 de {resumen.Total} casos)");
 Console.WriteLine($"Costo USD: total {resumen.CostoTotalUsd:F6}, promedio {resumen.CostoPromedioUsd:F6}, estimado por 1.000 preguntas {resumen.CostoPor1000Usd:F4} (mismo denominador)");
+if (resumen.RespondioRespaldo > 0)
+    Console.WriteLine($"INCONCLUSA: respondió un respaldo en {resumen.RespondioRespaldo} caso(s); los evals miden un único proveedor. Quite los LLM_RESPALDO_* o espere a que el principal tenga cuota.");
 Console.WriteLine($"Veredicto: {veredicto}");
 
 var um = UsoModelo.Resumir(resultados, Environment.GetEnvironmentVariable("LLM_MODEL"),

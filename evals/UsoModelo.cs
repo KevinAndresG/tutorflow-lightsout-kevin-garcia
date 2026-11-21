@@ -5,7 +5,7 @@ namespace TutorFlow.Evals;
 
 public sealed record LineaAuditoria(
     string? ModeloPedido, List<string> ModelosRespondidos, long TokensEntrada, long TokensSalida,
-    long Tokens, double CostoUsd, int Codigo);
+    long Tokens, double CostoUsd, int Codigo, string? Proveedor = null);
 
 public sealed class GrupoUso
 {
@@ -80,7 +80,7 @@ public static class UsoModelo
                             if (m.ValueKind == JsonValueKind.String && m.GetString() is { Length: > 0 } s) modelos.Add(s);
                     res = new LineaAuditoria(Str(r, "modeloPedido"), modelos, Num(r, "tokensEntrada"), Num(r, "tokensSalida"),
                         Num(r, "tokens"), r.TryGetProperty("costoUsd", out var c) && c.ValueKind == JsonValueKind.Number ? c.GetDouble() : 0,
-                        (int)Num(r, "codigo"));
+                        (int)Num(r, "codigo"), Str(r, "proveedor"));
                 }
                 catch (JsonException) { }
             }
@@ -101,6 +101,7 @@ public static class UsoModelo
         {
             r.ModeloPedido = a.ModeloPedido;
             r.ModelosRespondidos = a.ModelosRespondidos;
+            r.Proveedor = a.Proveedor;
             r.TokensEntrada = a.TokensEntrada;
             r.TokensSalida = a.TokensSalida;
         }
