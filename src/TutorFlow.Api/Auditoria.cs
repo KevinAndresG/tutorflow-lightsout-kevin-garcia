@@ -39,7 +39,7 @@ public record RegistroAuditoria(
     string? ModeloPedido = null, IReadOnlyList<string>? ModelosRespondidos = null, long TokensEntrada = 0, long TokensSalida = 0,
     string? Proveedor = null, IReadOnlyList<IntentoProveedor>? Intentos = null);
 
-// Un intento contra un proveedor. Resultado: "ok", "429", "503", "tiempo" o "error".
+// Un intento contra un proveedor. Resultado: "ok", "429", "400", "503", "tiempo" o "error".
 public record IntentoProveedor(string Proveedor, string Resultado);
 
 // Una línea JSON por pregunta. Un fallo al escribir nunca tumba la petición.

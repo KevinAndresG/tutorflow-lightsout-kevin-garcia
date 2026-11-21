@@ -77,7 +77,7 @@ public class Asistente(Reglamento reglamento, Datos datos, Proveedores proveedor
             }
             catch (LlmException e)
             {
-                resultado = e.Causa switch { LlmCausa.Http429 => "429", LlmCausa.Http503 => "503", LlmCausa.Tiempo => "tiempo", _ => "error" };
+                resultado = e.Causa switch { LlmCausa.Http429 => "429", LlmCausa.Http400 => "400", LlmCausa.Http503 => "503", LlmCausa.Tiempo => "tiempo", _ => "error" };
                 if (e.Causa == LlmCausa.Otro || i == lista.Count - 1) throw;
             }
             finally

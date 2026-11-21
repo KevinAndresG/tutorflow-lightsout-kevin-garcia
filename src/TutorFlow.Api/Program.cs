@@ -166,7 +166,9 @@ app.MapPost("/api/asistente/preguntar", async (HttpRequest req, Datos datos, ICo
             catch (OperationCanceledException) when (req.HttpContext.RequestAborted.IsCancellationRequested) { throw; }
             catch (Exception e)
             {
-                log.LogWarning("Falla del asistente o del proveedor ({Tipo}).", e.GetType().Name);
+                var le = e as LlmException;
+                log.LogWarning("Falla del asistente o del proveedor ({Tipo}) http={EstadoHttp} codigo={CodigoProveedor}.",
+                    e.GetType().Name, le?.EstadoHttp?.ToString() ?? "-", le?.CodigoProveedor ?? "-");
                 return Error(503, "El proveedor del modelo no está disponible.");
             }
 

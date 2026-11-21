@@ -288,10 +288,68 @@ public class RespaldosLlmTests
         AssertSinLlaves(e, b);
     }
 
+    [Fact]
+    public async Task ESC_05_7_principal_400_salta_al_respaldo()
+    {
+        var cfg = Principal();
+        Respaldo(cfg, 1, "r1.test", LlaveR1, "modelo-r1", "3", "6");
+        var h = new PorHost().Ruta("principal.test", HttpStatusCode.BadRequest).RutaOk("r1.test");
+        using var e = new Entorno(h, cfg);
+
+        var (c, b) = await e.Preguntar();
+        Assert.Equal(HttpStatusCode.OK, c);
+        Assert.Equal(1, h.Cuenta("principal.test"));
+        Assert.Equal(1, h.Cuenta("r1.test"));
+        var l = await e.UnaLinea();
+        Assert.Equal(200, Codigo(l));
+        Assert.Equal("respaldo-1", Proveedor(l));
+        Assert.Equal([("principal", "400"), ("respaldo-1", "ok")], Intentos(l));
+        AssertSinLlaves(e, b);
+    }
+
+    [Fact]
+    public async Task ESC_05_7_principal_400_tool_use_failed_salta_al_respaldo()
+    {
+        var cfg = Principal();
+        Respaldo(cfg, 1, "r1.test", LlaveR1, "modelo-r1", "3", "6");
+        var h = new PorHost().Ruta("principal.test", () => Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest)
+        {
+            Content = new StringContent(
+                "{\"error\":{\"message\":\"Failed to call a function. Please adjust your prompt.\",\"type\":\"invalid_request_error\",\"code\":\"tool_use_failed\",\"failed_generation\":\"<function=consultar_notas>{}</function>\"}}",
+                Encoding.UTF8, "application/json"),
+        })).RutaOk("r1.test");
+        using var e = new Entorno(h, cfg);
+
+        var (c, b) = await e.Preguntar();
+        Assert.Equal(HttpStatusCode.OK, c);
+        Assert.Equal(1, h.Cuenta("r1.test"));
+        var l = await e.UnaLinea();
+        Assert.Equal("respaldo-1", Proveedor(l));
+        Assert.Equal([("principal", "400"), ("respaldo-1", "ok")], Intentos(l));
+        AssertSinLlaves(e, b);
+    }
+
+    [Fact]
+    public async Task ESC_05_7_todos_los_proveedores_400_da_503_con_todos_los_intentos()
+    {
+        var cfg = Principal();
+        Respaldo(cfg, 1, "r1.test", LlaveR1, "modelo-r1", "3", "6");
+        var h = new PorHost().Ruta("principal.test", HttpStatusCode.BadRequest).Ruta("r1.test", HttpStatusCode.BadRequest);
+        using var e = new Entorno(h, cfg);
+
+        var (c, b) = await e.Preguntar();
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, c);
+        AssertCuerpoError(b);
+        var l = await e.UnaLinea();
+        Assert.Equal(503, Codigo(l));
+        Assert.Null(Proveedor(l));
+        Assert.Equal([("principal", "400"), ("respaldo-1", "400")], Intentos(l));
+        AssertSinLlaves(e, b);
+    }
+
     [Theory]
-    [InlineData(HttpStatusCode.BadRequest)]
     [InlineData(HttpStatusCode.Unauthorized)]
-    public async Task ESC_05_7_principal_400_o_401_no_salta_al_respaldo_y_da_503(HttpStatusCode codigoPrincipal)
+    public async Task ESC_05_7_principal_401_no_salta_al_respaldo_y_da_503(HttpStatusCode codigoPrincipal)
     {
         var cfg = Principal();
         Respaldo(cfg, 1, "r1.test", LlaveR1, "modelo-r1", "3", "6");
