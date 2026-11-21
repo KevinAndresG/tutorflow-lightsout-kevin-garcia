@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Compilar
+        run: dotnet build -warnaserror
+      - name: Pruebas
+        run: dotnet test --no-build
+      - name: Detectar interfaz
+        id: web
+        run: |
+          if [ -f src/web/package.json ]; then echo "existe=true" >> "$GITHUB_OUTPUT"; else echo "existe=false" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/setup-node@v4
+        if: steps.web.outputs.existe == 'true'
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/web/package-lock.json
+      - name: Interfaz
+        if: steps.web.outputs.existe == 'true'
+        working-directory: src/web
+        run: |
+          npm ci
+          npm run build
+          npm test --if-present
+
+  docker:
+    needs: pruebas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construir imagen
+        run: docker compose build
+      - name: Levantar sin llave
+        run: docker compose up -d
+      - name: Verificar salud e interfaz
+        run: |
+          ok=0
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/api/salud -o salud.json; then ok=1; break; fi
+            sleep 2
+          done
+          if [ "$ok" != 1 ]; then docker compose logs tutorflow; echo "La API no respondió."; exit 1; fi
+          cat salud.json; echo
+          python3 -c 'import json,sys; sys.exit(0 if json.load(open("salud.json"))=={"estado":"ok"} else 1)'
+          code=$(curl -s -o raiz.html -w '%{http_code}' http://localhost:8080/)
+          [ "$code" = 200 ] || { echo "GET / devolvió $code"; exit 1; }
+          grep -qi '<html' raiz.html || { echo "GET / no devolvió HTML"; exit 1; }
+      - name: Detener
+        if: always()
+        run: docker compose down -v
+
+  evals:
+    needs: pruebas
+    runs-on: ubuntu-latest
+    env:
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
+      LLM_MODEL: ${{ vars.LLM_MODEL }}
+      LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
+      LLM_PRECIO_ENTRADA_MTOK: ${{ vars.LLM_PRECIO_ENTRADA_MTOK }}
+      LLM_PRECIO_SALIDA_MTOK: ${{ vars.LLM_PRECIO_SALIDA_MTOK }}
+      Auditoria__Ruta: ${{ github.workspace }}/evals-logs/auditoria.jsonl
+      EVALS_API_URL: http://localhost:8080
+      EVALS_AUDITORIA: ${{ github.workspace }}/evals-logs/auditoria.jsonl
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exigir llave
+        run: |
+          if [ -z "$LLM_API_KEY" ]; then
+            echo "::error::Falta el secreto LLM_API_KEY: los evals no pueden correr y no se aprueban sin ejecutarse."
+            exit 1
+          fi
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Compilar
+        run: dotnet build -c Release
+      - name: Arrancar la API
+        run: |
+          mkdir -p evals-logs
+          nohup dotnet run --no-build -c Release --project src/TutorFlow.Api --urls http://localhost:8080 > api.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:8080/api/salud >/dev/null 2>&1 && exit 0
+            sleep 2
+          done
+          echo "La API no arrancó."; tail -n 50 api.log; exit 1
+      - name: Evals
+        run: dotnet run --no-build -c Release --project evals
+      - name: Subir resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evals-resultados
+          path: evals/resultados/ultimo.json
+          if-no-files-found: warn

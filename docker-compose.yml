@@ -1,0 +1,19 @@
+services:
+  tutorflow:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file:
+      - path: .env
+        required: false
+    # Sin valor: se toman del entorno del anfitrión solo si existen; nunca hay llaves por defecto.
+    environment:
+      - LLM_API_KEY
+      - LLM_PROVIDER
+      - LLM_BASE_URL
+      - LLM_MODEL
+      - LLM_PRECIO_ENTRADA_MTOK
+      - LLM_PRECIO_SALIDA_MTOK
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
