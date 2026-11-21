@@ -38,3 +38,19 @@
 - **Cuando** se llama `GET /api/salud`
 - **Entonces** responde `200 {"estado":"ok"}`
 - Criterios: CA-01, CA-15
+
+### ESC-05.7 · Proveedor sin cuota con respaldo configurado
+- **Dado** que el proveedor principal responde 429 (sin cuota) y hay un respaldo configurado
+- **Cuando** un usuario válido pregunta algo permitido
+- **Entonces** responde 200 usando el respaldo
+- **Y** `costoUsd` usa el precio del respaldo
+- **Y** la auditoría registra el proveedor y el modelo que respondieron
+- **Pero si** el principal responde otro error (por ejemplo 400 o 401), no se salta al respaldo
+- **Y si** fallan todos, responde 503
+- Criterios: CA-12, CA-13
+
+### ESC-05.8 · Byte inválido en cualquier campo
+- **Dado** una petición cuyo cuerpo tiene bytes que no son UTF-8 válido, aunque estén en un campo que la API no usa
+- **Cuando** llega a `POST /api/asistente/preguntar`
+- **Entonces** responde 400 sin llamar al modelo
+- Criterios: CA-09

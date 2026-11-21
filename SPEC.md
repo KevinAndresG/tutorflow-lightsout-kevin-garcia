@@ -56,9 +56,9 @@ Nadie más existe. Un `id` que no está en los datos, o que no corresponde al ro
 
 **RN-08 · Usuario inválido.** Si el `id` no existe, o existe pero con otro rol, la respuesta es **403**.
 
-**RN-09 · Entrada inválida.** Cuerpo mal formado, `pregunta` vacía o de más de 1.000 caracteres, o `rol` distinto de `estudiante`/`coordinador` → **400**.
+**RN-09 · Entrada inválida.** Cuerpo mal formado, `pregunta` vacía o de más de 1.000 caracteres, o `rol` distinto de `estudiante`/`coordinador` → **400**. Un cuerpo con bytes que no son UTF-8 válido también es mal formado, aunque el byte esté en un campo que la API no usa.
 
-**RN-10 · Auditoría.** Cada pregunta, incluidas las rechazadas, queda registrada en los logs con: fecha y hora, rol e id del usuario, pregunta, ids de estudiantes cuyos datos se consultaron, citas devueltas, código de respuesta, tokens y costo.
+**RN-10 · Auditoría.** Cada pregunta, incluidas las rechazadas, queda registrada en los logs con: fecha y hora, rol e id del usuario, pregunta, ids de estudiantes cuyos datos se consultaron, citas devueltas, código de respuesta, tokens, costo, y proveedor y modelo que respondieron (si hubo llamada al modelo).
 
 **RN-11 · Uso de datos honesto.** `usoDatosEstudiante` es `true` si y solo si se ejecutó al menos una herramienta que devolvió datos de un estudiante.
 
@@ -98,7 +98,7 @@ Otros códigos:
 |---|---|
 | 400 | Entrada inválida (RN-09) |
 | 403 | El usuario pide datos que no le corresponden (RN-05, RN-06) o no es un usuario válido (RN-08) |
-| 503 | El proveedor del modelo no responde o no hay `LLM_API_KEY` configurada |
+| 503 | Ni el proveedor principal ni ninguno de los respaldos responde, o no hay `LLM_API_KEY` configurada |
 
 Los nombres de los campos, su tipo y su capitalización son exactamente los de arriba. No se agregan campos obligatorios.
 
@@ -115,6 +115,7 @@ Los nombres de los campos, su tipo y su capitalización son exactamente los de a
 | `LLM_BASE_URL` | No | Endpoint del proveedor. Por defecto, el de Gemini con `openai`, y `https://api.anthropic.com` con `anthropic` |
 | `LLM_MODEL` | No | Modelo a usar |
 | `LLM_PRECIO_ENTRADA_MTOK` / `LLM_PRECIO_SALIDA_MTOK` | No | Precio USD por millón de tokens, para `costoUsd` |
+| `LLM_RESPALDO_N_API_KEY`, `LLM_RESPALDO_N_PROVIDER`, `LLM_RESPALDO_N_BASE_URL`, `LLM_RESPALDO_N_MODEL`, `LLM_RESPALDO_N_PRECIO_ENTRADA_MTOK`, `LLM_RESPALDO_N_PRECIO_SALIDA_MTOK` | No | Proveedores de respaldo opcionales, con N = 1, 2, 3… en orden de uso. Cada uno con su propia llave, modelo y precio. Un respaldo sin `API_KEY` se ignora |
 
 ### Endpoints auxiliares (para la interfaz, fuera del contrato evaluado)
 - `GET /api/usuarios/demo` → lista de usuarios de prueba con rol, nombre y programa.
@@ -195,3 +196,6 @@ Cada criterio tiene al menos un escenario en `/escenarios` y al menos una prueba
 | Coordinador pregunta solo por reglamento | Se responde normal, `usoDatosEstudiante: false`. | Un coordinador también tiene dudas de norma. |
 | Sin `LLM_API_KEY` | `/api/salud` sigue en 200; preguntar devuelve 503. | La salud del servicio no depende de un tercero. |
 | Proveedor del modelo | Dos adaptadores: formato OpenAI (Gemini, Groq, OpenAI, Ollama) y Anthropic nativo, elegidos con `LLM_PROVIDER`. | Permite usar un plan gratuito, un modelo local o Claude sin cambiar código. La API de Anthropic nativa permite caché de prompt, útil porque el reglamento se repite en cada pregunta. |
+| ¿Qué pasa si el proveedor se queda sin cuota o no responde? | Se prueba el siguiente respaldo configurado, en orden, solo ante 429 (cuota), 503 o tiempo agotado. Ante cualquier otro error no se salta. `costoUsd` usa el precio del proveedor que respondió, y la auditoría registra cuál fue. Si fallan todos, 503. | Los planes gratuitos se agotan rápido y un error de cuota no debería tumbar el servicio. Saltar ante otros errores escondería fallos reales. |
+| ¿Los evals usan los respaldos? | No. Corren con un único proveedor fijo; un 429 marca la corrida como no concluyente, nunca como aprobada. | Mezclar modelos haría que el puntaje y el costo por 1.000 preguntas dejaran de ser comparables. |
+| Byte inválido en un campo que la API no lee | 400, igual que cualquier cuerpo mal formado. | Un cuerpo inválido es inválido entero; aceptarlo a medias depende de qué campos lee hoy el código. |
