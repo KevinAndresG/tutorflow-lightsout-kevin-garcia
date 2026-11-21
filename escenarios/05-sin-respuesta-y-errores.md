@@ -45,7 +45,7 @@
 - **Entonces** responde 200 usando el respaldo
 - **Y** `costoUsd` usa el precio del respaldo
 - **Y** la auditoría registra el proveedor y el modelo que respondieron
-- **Pero si** el principal responde otro error (por ejemplo 400 o 401), no se salta al respaldo
+- **Pero si** el principal responde otro error (por ejemplo 401 o 500), no se salta al respaldo
 - **Y si** fallan todos, responde 503
 - Criterios: CA-12, CA-13
 
