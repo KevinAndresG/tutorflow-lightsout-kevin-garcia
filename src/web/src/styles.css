@@ -1,0 +1,15 @@
+@import 'tailwindcss';
+
+/* Modo oscuro por clase en <html> (la pone App segun localStorage o prefers-color-scheme). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+html {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
+dialog.cita-dialog::backdrop {
+  background: rgb(0 0 0 / 0.55);
+}

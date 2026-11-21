@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <script>
+      try {
+        var t = localStorage.getItem('tema');
+        var o = t === 'dark' || (t !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (o) document.documentElement.classList.add('dark');
+      } catch (e) {}
+    </script>
+    <title>TutorFlow</title>
+  </head>
+  <body class="overflow-x-hidden bg-slate-100 font-sans text-slate-900 dark:bg-slate-900 dark:text-slate-200">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
