@@ -29,7 +29,8 @@ public static class Auxiliares
         {
             app.UseDefaultFiles();
             app.UseStaticFiles();
-            app.MapFallbackToFile("{**ruta:regex(^(?!api(/|$)).*$)}", "index.html");
+            // nonfile: las rutas con extensión (/assets/app.js) no casan, así que las sirve StaticFiles y no el index.
+            app.MapFallbackToFile("{**ruta:nonfile:regex(^(?!api(/|$)).*$)}", "index.html");
         }
     }
 }
