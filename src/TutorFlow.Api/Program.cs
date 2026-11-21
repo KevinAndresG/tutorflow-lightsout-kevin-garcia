@@ -62,10 +62,13 @@ app.Services.GetRequiredService<ILlmClient>();
 app.Services.GetRequiredService<Precios>();
 app.Services.GetRequiredService<Proveedores>();
 
+Auxiliares.Mapear(app);
+Auxiliares.ServirInterfaz(app);
+
 app.MapGet("/api/salud", () => Results.Json(new { estado = "ok" }));
 
 app.MapPost("/api/asistente/preguntar", async (HttpRequest req, Datos datos, IConfiguration cfg, Asistente asistente,
-    Auditoria auditoria, ILogger<Program> log) =>
+    Auditoria auditoria, Proveedores proveedores, ILogger<Program> log) =>
 {
     // Un solo punto de registro: el finally cubre toda ruta de salida.
     string? rolAud = null, idAud = null, preguntaAud = null;
@@ -152,7 +155,9 @@ app.MapPost("/api/asistente/preguntar", async (HttpRequest req, Datos datos, ICo
                 return Error(503, "El servicio del modelo no está disponible: falta configurar LLM_API_KEY.");
 
             var plazo = double.TryParse(cfg["Asistente:PlazoSegundos"], System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var seg) && seg > 0 ? seg : 90;
+                System.Globalization.CultureInfo.InvariantCulture, out var seg) && seg > 0
+                ? seg
+                : proveedores.Lista.Count > 1 ? 60 * proveedores.Lista.Count + 30 : 90;
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(req.HttpContext.RequestAborted);
             cts.CancelAfter(TimeSpan.FromSeconds(plazo));
 

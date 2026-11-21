@@ -2,7 +2,9 @@ services:
   tutorflow:
     build: .
     ports:
-      - "8080:8080"
+      # Solo loopback: la identidad viene del cuerpo sin autenticación (SPEC §8).
+      - "127.0.0.1:8080:8080"
+    # Las LLM_RESPALDO_N_* llegan solo vía .env (env_file).
     env_file:
       - path: .env
         required: false
