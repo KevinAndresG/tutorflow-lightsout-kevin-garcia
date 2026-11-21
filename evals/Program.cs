@@ -28,9 +28,22 @@ var url = (Environment.GetEnvironmentVariable("EVALS_API_URL") is { Length: > 0 
 var pausaMs = int.TryParse(Environment.GetEnvironmentVariable("EVALS_PAUSA_MS"), out var pm) ? pm : 1500;
 var esperaMs = int.TryParse(Environment.GetEnvironmentVariable("EVALS_ESPERA_MS"), out var em) ? em : 2000;
 const int Reintentos = 3;
+// Sin EVALS_AUDITORIA hay dos rutas posibles: la API escribe en logs/ relativo a su directorio de trabajo, así que
+// queda en <raíz>/logs si se arranca desde la raíz o con docker, y en <raíz>/src/TutorFlow.Api/logs con
+// `dotnet run --project`. Se elige la que exista y sea más reciente.
+static string ElegirAuditoria(string baseDir)
+{
+    var candidatas = new[]
+    {
+        Path.Combine(baseDir, "logs", "auditoria.jsonl"),
+        Path.Combine(baseDir, "src", "TutorFlow.Api", "logs", "auditoria.jsonl"),
+    };
+    var existentes = candidatas.Where(File.Exists).ToList();
+    return existentes.Count == 0 ? candidatas[0] : existentes.OrderByDescending(File.GetLastWriteTimeUtc).First();
+}
 var rutaAud = Environment.GetEnvironmentVariable("EVALS_AUDITORIA") is { Length: > 0 } ea
     ? Path.GetFullPath(ea)
-    : Path.Combine(raiz ?? Directory.GetCurrentDirectory(), "logs", "auditoria.jsonl");
+    : ElegirAuditoria(raiz ?? Directory.GetCurrentDirectory());
 var llave = Environment.GetEnvironmentVariable("LLM_API_KEY"); // solo para R2; no se envía a ningún lado
 
 if (string.IsNullOrEmpty(llave))
@@ -106,8 +119,8 @@ Console.WriteLine();
 Console.WriteLine($"Aprobadas: {resumen.Aprobadas}/{resumen.ConResultado} con resultado ({resumen.Total} casos, {resumen.SinResultado} sin resultado)");
 Console.WriteLine($"Puntaje: {resumen.Puntaje:P1} (umbral {resumen.Umbral:P0})");
 Console.WriteLine($"Reglas duras (R1 citas, R2 privacidad/llave): {(resumen.ReglasDurasOk ? "OK" : "VIOLADAS")}");
-Console.WriteLine($"Tokens: total {resumen.TokensTotales}, promedio {resumen.TokensPromedio:F1} por pregunta");
-Console.WriteLine($"Costo USD: total {resumen.CostoTotalUsd:F6}, promedio {resumen.CostoPromedioUsd:F6}, estimado por 1.000 preguntas {resumen.CostoPor1000Usd:F4}");
+Console.WriteLine($"Tokens: total {resumen.TokensTotales}, promedio {resumen.TokensPromedio:F1} por pregunta con respuesta (sobre {resumen.ConRespuesta} respuestas 200 de {resumen.Total} casos)");
+Console.WriteLine($"Costo USD: total {resumen.CostoTotalUsd:F6}, promedio {resumen.CostoPromedioUsd:F6}, estimado por 1.000 preguntas {resumen.CostoPor1000Usd:F4} (mismo denominador)");
 Console.WriteLine($"Veredicto: {veredicto}");
 
 var um = UsoModelo.Resumir(resultados, Environment.GetEnvironmentVariable("LLM_MODEL"),
@@ -120,7 +133,7 @@ Console.WriteLine($"  Preguntas: {um.Preguntas} (sin línea de auditoría: {um.S
 Console.WriteLine($"  MODELO DISTINTO: {um.ModeloDistinto} preguntas");
 Console.WriteLine($"  Precios USD/Mtok: entrada {um.PrecioEntradaMtok}, salida {um.PrecioSalidaMtok}");
 void Imprimir(string nombre, GrupoUso g) =>
-    Console.WriteLine($"  {nombre}: {g.Preguntas} preguntas | tokens entrada {g.TokensEntrada}, salida {g.TokensSalida}, total {g.Tokens}, promedio {g.TokensPromedio:F1} | costo total {g.CostoTotalUsd:F6} USD, estimado por 1.000 preguntas {g.CostoPor1000Usd:F4} USD");
+    Console.WriteLine($"  {nombre}: {g.ConRespuesta} con respuesta del modelo de {g.Preguntas} en el grupo ({g.SinResultado} sin resultado, excluidas del promedio) | tokens entrada {g.TokensEntrada}, salida {g.TokensSalida}, total {g.Tokens}, promedio {g.TokensPromedio:F1} | costo total {g.CostoTotalUsd:F6} USD, estimado por 1.000 preguntas {g.CostoPor1000Usd:F4} USD");
 Imprimir("(a) Terminaron en 403", um.Rechazadas403);
 if (um.Rechazadas403.ConTokens.Count > 0)
     Console.WriteLine($"      ATENCION: 403 con tokens > 0 (403 por herramienta tras llamar al modelo): {string.Join(", ", um.Rechazadas403.ConTokens)}");

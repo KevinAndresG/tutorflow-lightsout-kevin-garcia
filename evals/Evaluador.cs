@@ -74,6 +74,8 @@ public sealed class Resumen
     public double Umbral { get; set; } = Umbrales.PuntajeMinimo;
     public bool ReglasDurasOk { get; set; }
     public long TokensTotales { get; set; }
+    /// <summary>Denominador de los promedios: respuestas 200 con contrato completo.</summary>
+    public int ConRespuesta { get; set; }
     public double TokensPromedio { get; set; }
     public double CostoTotalUsd { get; set; }
     public double CostoPromedioUsd { get; set; }
@@ -321,6 +323,7 @@ public static class Evaluador
         var con = rs.Where(x => x.Conto200).ToList();
         s.TokensTotales = con.Sum(x => x.Tokens);
         s.CostoTotalUsd = con.Sum(x => x.CostoUsd);
+        s.ConRespuesta = con.Count;
         if (con.Count > 0)
         {
             s.TokensPromedio = (double)s.TokensTotales / con.Count;

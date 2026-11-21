@@ -89,11 +89,20 @@ app.MapPost("/api/asistente/preguntar", async (HttpRequest req, Datos datos, ICo
             static string? Texto(JsonElement e, string nombre) =>
                 e.ValueKind == JsonValueKind.Object && e.TryGetProperty(nombre, out var v) && v.ValueKind == JsonValueKind.String
                     ? v.GetString() : null;
-            preguntaAud = Texto(raiz, "pregunta");
-            if (raiz.TryGetProperty("usuario", out var uAud))
+            try
             {
-                rolAud = Texto(uAud, "rol");
-                idAud = Texto(uAud, "id");
+                preguntaAud = Texto(raiz, "pregunta");
+                if (raiz.TryGetProperty("usuario", out var uAud))
+                {
+                    rolAud = Texto(uAud, "rol");
+                    idAud = Texto(uAud, "id");
+                }
+            }
+            catch (Exception e) when (e is InvalidOperationException or FormatException)
+            {
+                // Bytes que no son UTF-8 válido dentro de una cadena JSON: ParseAsync no falla, GetString sí.
+                preguntaAud = rolAud = idAud = null;
+                return Error(400, "El cuerpo no es un JSON válido.");
             }
 
             if (string.IsNullOrWhiteSpace(preguntaAud)) return Error(400, "La pregunta es obligatoria.");

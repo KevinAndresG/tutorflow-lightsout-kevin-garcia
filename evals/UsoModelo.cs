@@ -10,6 +10,10 @@ public sealed record LineaAuditoria(
 public sealed class GrupoUso
 {
     public int Preguntas { get; set; }
+    /// <summary>Preguntas con respuesta del modelo (tokens &gt; 0 o código 200); solo ellas entran en los promedios.</summary>
+    public int ConRespuesta { get; set; }
+    /// <summary>Preguntas sin resultado (excluidas de los promedios).</summary>
+    public int SinResultado { get; set; }
     public long TokensEntrada { get; set; }
     public long TokensSalida { get; set; }
     public long Tokens { get; set; }
@@ -133,10 +137,13 @@ public static class UsoModelo
         g.TokensSalida = rs.Sum(x => x.TokensSalida);
         g.Tokens = rs.Sum(x => x.TokensUso);
         g.CostoTotalUsd = rs.Sum(x => x.CostoUsoUsd);
-        if (rs.Count > 0)
+        g.SinResultado = rs.Count(x => x.Estado == Estado.SinResultado);
+        // Denominador: solo las que obtuvieron respuesta del modelo; las SIN RESULTADO (0 tokens) subestimarían el promedio.
+        g.ConRespuesta = rs.Count(x => x.Estado != Estado.SinResultado && (x.TokensUso > 0 || x.Codigo == 200));
+        if (g.ConRespuesta > 0)
         {
-            g.TokensPromedio = (double)g.Tokens / rs.Count;
-            g.CostoPor1000Usd = g.CostoTotalUsd / rs.Count * 1000;
+            g.TokensPromedio = (double)g.Tokens / g.ConRespuesta;
+            g.CostoPor1000Usd = g.CostoTotalUsd / g.ConRespuesta * 1000;
         }
         g.ConTokens = rs.Where(x => x.TokensUso > 0).Select(x => x.Id).ToList();
         return g;
